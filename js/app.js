@@ -67,6 +67,9 @@
   function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     setTheme(current === 'dark' ? 'light' : 'dark');
+    // Re-render canvases since heat map colors are theme-dependent
+    const view = state.navStack[state.navStack.length - 1] || 'books';
+    if (view === 'books') renderBookGrid();
   }
 
   // ===== Toast =====
@@ -148,14 +151,32 @@
     return 'var(--heat-4)';
   }
 
+  // ===== Heat color as raw RGB (for canvas) =====
+  function getHeatRGB(count, maxCount) {
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const colors = theme === 'light'
+      ? [[235,237,240],[155,233,168],[64,196,99],[48,161,78],[33,110,57]]
+      : [[22,27,34],[14,68,41],[0,109,50],[38,166,65],[57,211,83]];
+    if (count === 0) return colors[0];
+    if (maxCount === 0) return colors[0];
+    const ratio = count / maxCount;
+    if (ratio <= 0.25) return colors[1];
+    if (ratio <= 0.5) return colors[2];
+    if (ratio <= 0.75) return colors[3];
+    return colors[4];
+  }
+
   // ===== Book Grid =====
   function renderBookGrid() {
     dom.bookGrid.innerHTML = '';
     const testament = state.currentTestament;
     const categories = BIBLE_DATA.categories[testament];
-    const maxBookHeat = Math.max(...BIBLE_DATA.books
-      .filter(b => b.testament === testament)
-      .map(b => storage.getBookHeat(b.abbr)), 0.001);
+
+    // Global max verse read count for this testament (for heat scaling)
+    const globalMaxCount = Math.max(storage.getMaxCountByTestament(testament), 1);
+
+    // Cell size for the tiny verse pixels
+    const CELL_PX = 3;
 
     for (const [category, bookAbbrs] of Object.entries(categories)) {
       const section = document.createElement('div');
@@ -175,31 +196,49 @@
 
         const totalVerses = book.chapters.reduce((a, b) => a + b, 0);
         const versesRead = storage.getBookVersesRead(abbr);
-        const heat = storage.getBookHeat(abbr);
-        const heatLevel = getHeatLevel(heat, maxBookHeat);
 
-        // Size proportional to verse count (sqrt for visual balance)
-        const minSize = 42;
-        const maxSize = 90;
-        const maxVerses = Math.max(...BIBLE_DATA.books
-          .filter(b => b.testament === testament)
-          .map(b => b.chapters.reduce((a, c) => a + c, 0)));
-        const sizeRatio = Math.sqrt(totalVerses / maxVerses);
-        const size = Math.round(minSize + (maxSize - minSize) * sizeRatio);
+        // Calculate grid layout: roughly square
+        const cols = Math.ceil(Math.sqrt(totalVerses));
+        const rows = Math.ceil(totalVerses / cols);
+        const canvasW = cols * CELL_PX;
+        const canvasH = rows * CELL_PX;
+
+        // Ensure minimum block size for touch (48px)
+        const blockW = Math.max(canvasW + 4, 48); // 4px padding
+        const blockH = Math.max(canvasH + 16, 48); // 16px for label
 
         const block = document.createElement('div');
-        block.className = 'book-block' + (size >= 70 ? ' large-block' : '');
-        block.style.width = size + 'px';
-        block.style.height = size + 'px';
-        block.style.background = getHeatColor(heatLevel);
-        if (heatLevel === 0) block.setAttribute('data-heat', '0');
+        block.className = 'book-block' + (blockW >= 60 ? ' large-block' : '');
+        block.style.width = blockW + 'px';
+        block.style.height = blockH + 'px';
+
+        // Canvas for the verse heat map
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        canvas.style.width = canvasW + 'px';
+        canvas.style.height = canvasH + 'px';
+        const ctx = canvas.getContext('2d');
+
+        // Draw each verse as a tiny cell
+        const verseCounts = storage.getBookVerseCountsFlat(abbr);
+        let prevColor = '';
+        for (let i = 0; i < verseCounts.length; i++) {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const rgb = getHeatRGB(verseCounts[i], globalMaxCount);
+          const color = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+          if (color !== prevColor) { ctx.fillStyle = color; prevColor = color; }
+          ctx.fillRect(col * CELL_PX, row * CELL_PX, CELL_PX, CELL_PX);
+        }
+
+        block.appendChild(canvas);
 
         const label = document.createElement('span');
         label.className = 'book-label';
         label.textContent = abbr;
         block.appendChild(label);
 
-        // Tooltip info
         block.title = `${book.name}: ${versesRead}/${totalVerses} verses`;
 
         block.addEventListener('click', () => {
@@ -261,11 +300,13 @@
         cell.appendChild(progress);
       }
 
-      // Long press to mark entire chapter
+      // Long press to mark entire chapter, short tap to navigate
       let longPressTimer;
+      let longPressFired = false;
       const startLongPress = (e) => {
-        e.preventDefault();
+        longPressFired = false;
         longPressTimer = setTimeout(async () => {
+          longPressFired = true;
           // Mark all verses in chapter as read
           const verses = [];
           for (let v = 1; v <= verseCount; v++) {
@@ -274,22 +315,33 @@
           await storage.markRead(verses);
           showToast(`${book.name} ${chNum} marked as read`);
           renderChapterGrid();
-          // Haptic feedback
           if (navigator.vibrate) navigator.vibrate(50);
         }, 600);
       };
       const cancelLongPress = () => clearTimeout(longPressTimer);
 
-      cell.addEventListener('touchstart', startLongPress, { passive: false });
-      cell.addEventListener('touchend', cancelLongPress);
+      cell.addEventListener('touchstart', (e) => {
+        startLongPress(e);
+      }, { passive: true });
+      cell.addEventListener('touchend', (e) => {
+        cancelLongPress();
+        if (!longPressFired) {
+          // Short tap: navigate to verses
+          state.currentChapter = chNum;
+          state.selectedVerses.clear();
+          navigateTo('verses');
+          renderVerseGrid();
+        }
+        e.preventDefault(); // prevent ghost click
+      });
       cell.addEventListener('touchmove', cancelLongPress);
       cell.addEventListener('mousedown', startLongPress);
       cell.addEventListener('mouseup', cancelLongPress);
       cell.addEventListener('mouseleave', cancelLongPress);
 
-      // Tap to go to verses
-      cell.addEventListener('click', () => {
-        // Only navigate if long press didn't fire
+      // Click for desktop (mouse)
+      cell.addEventListener('click', (e) => {
+        if (longPressFired) return;
         state.currentChapter = chNum;
         state.selectedVerses.clear();
         navigateTo('verses');
