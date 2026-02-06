@@ -242,68 +242,76 @@ body {
 #book-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
+  align-items: flex-start;
 }
 
 .book-block {
   position: relative;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.15s;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   overflow: hidden;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  min-width: 48px;
+  min-height: 48px;
+  padding: 2px;
 }
 
 .book-block:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.book-block canvas {
+  display: block;
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 .book-block .book-label {
   font-size: 9px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   text-align: center;
-  line-height: 1.1;
-  padding: 2px;
+  line-height: 1;
+  padding: 1px 2px 0;
   pointer-events: none;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
   z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .book-block.large-block .book-label {
-  font-size: 11px;
-}
-
-.book-block[data-heat="0"] { background: var(--heat-0); border-color: var(--border); }
-.book-block[data-heat="0"] .book-label { text-shadow: none; color: var(--text-secondary); }
-
-/* Heat levels via CSS custom property */
-.book-block {
-  background: color-mix(in srgb, var(--heat-4) calc(var(--heat) * 100%), var(--heat-0));
+  font-size: 10px;
 }
 
 /* ===== Chapter Grid ===== */
 #chapter-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
 }
 
 .chapter-cell {
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.1s;
   border: 1px solid transparent;
   position: relative;
+  min-height: 56px;
 }
 
 .chapter-cell:active {
@@ -358,8 +366,8 @@ body {
 
 #verse-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
-  gap: 4px;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 5px;
   margin-bottom: 14px;
   user-select: none;
   -webkit-user-select: none;
@@ -367,16 +375,17 @@ body {
 
 .verse-cell {
   aspect-ratio: 1;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: transform 0.08s;
   border: 2px solid transparent;
   position: relative;
+  min-height: 48px;
 }
 
 .verse-cell:active {
@@ -708,7 +717,8 @@ body {
 .category-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
+  align-items: flex-start;
 }
 
 /* Empty state */

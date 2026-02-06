@@ -118,6 +118,34 @@ class BibleStorage {
     return max;
   }
 
+  // Get max read count for verses in a specific testament
+  getMaxCountByTestament(testament) {
+    const bookSet = new Set(
+      BIBLE_DATA.books.filter(b => b.testament === testament).map(b => b.abbr)
+    );
+    let max = 0;
+    for (const key in this.cache) {
+      const bookAbbr = key.split(':')[0];
+      if (bookSet.has(bookAbbr)) {
+        max = Math.max(max, this.cache[key].length);
+      }
+    }
+    return max;
+  }
+
+  // Get all verse read counts for a book as a flat array (chapter-ordered)
+  getBookVerseCountsFlat(bookAbbr) {
+    const book = BIBLE_DATA.getBook(bookAbbr);
+    if (!book) return [];
+    const counts = [];
+    for (let ch = 0; ch < book.chapters.length; ch++) {
+      for (let v = 1; v <= book.chapters[ch]; v++) {
+        counts.push(this.getVerseCount(bookAbbr, ch + 1, v));
+      }
+    }
+    return counts;
+  }
+
   // Get book-level heat (average reads per verse)
   getBookHeat(bookAbbr) {
     const bookData = BIBLE_DATA.getBook(bookAbbr);
