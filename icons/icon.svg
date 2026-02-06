@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0d1117"/>
+  <g transform="translate(80, 60) scale(0.7)">
+    <!-- Book shape -->
+    <path d="M80 40 C80 40 250 20 250 20 L250 400 C250 400 80 420 80 420 Z" fill="#161b22" stroke="#30363d" stroke-width="4"/>
+    <path d="M420 40 C420 40 250 20 250 20 L250 400 C250 400 420 420 420 420 Z" fill="#161b22" stroke="#30363d" stroke-width="4"/>
+    <!-- Spine -->
+    <line x1="250" y1="20" x2="250" y2="400" stroke="#30363d" stroke-width="3"/>
+    <!-- Heat map blocks on pages -->
+    <rect x="110" y="80" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="140" y="80" width="24" height="24" rx="3" fill="#26a641"/>
+    <rect x="170" y="80" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="200" y="80" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="110" y="110" width="24" height="24" rx="3" fill="#26a641"/>
+    <rect x="140" y="110" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="170" y="110" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="200" y="110" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="110" y="140" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="140" y="140" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="170" y="140" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="200" y="140" width="24" height="24" rx="3" fill="#26a641"/>
+    <rect x="280" y="80" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="310" y="80" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="340" y="80" width="24" height="24" rx="3" fill="#26a641"/>
+    <rect x="370" y="80" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="280" y="110" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="310" y="110" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="340" y="110" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="370" y="110" width="24" height="24" rx="3" fill="#26a641"/>
+    <rect x="280" y="140" width="24" height="24" rx="3" fill="#39d353"/>
+    <rect x="310" y="140" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="340" y="140" width="24" height="24" rx="3" fill="#006d32"/>
+    <rect x="370" y="140" width="24" height="24" rx="3" fill="#39d353"/>
+    <!-- More faded blocks to suggest grid -->
+    <rect x="110" y="180" width="24" height="24" rx="3" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <rect x="140" y="180" width="24" height="24" rx="3" fill="#0e4429"/>
+    <rect x="170" y="180" width="24" height="24" rx="3" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <rect x="200" y="180" width="24" height="24" rx="3" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  </g>
+  <!-- Title -->
+  <text x="256" y="470" text-anchor="middle" font-family="system-ui, sans-serif" font-size="64" font-weight="700" fill="#e6edf3">BHible</text>
+</svg>
