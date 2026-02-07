@@ -22,26 +22,58 @@
       </button>
       <h1 id="page-title">BHible</h1>
       <div id="top-actions">
-        <button id="lang-toggle" class="icon-btn lang-btn" aria-label="Toggle language">
-          <span id="lang-label">EN</span>
-        </button>
-        <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
-          <svg id="theme-icon-dark" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
-          <svg id="theme-icon-light" class="hidden" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
-        </button>
-        <button id="menu-btn" class="icon-btn" aria-label="Menu">
-          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+        <button id="settings-btn" class="icon-btn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- Dropdown menu -->
-    <div id="dropdown-menu" class="hidden">
-      <button id="menu-export" data-i18n="exportData">Export Data</button>
-      <button id="menu-import" data-i18n="importData">Import Data</button>
-      <label id="import-file-label">
-        <input type="file" id="import-file" accept=".json" style="display:none">
-      </label>
+    <!-- Settings Panel (slides over content) -->
+    <div id="settings-overlay" class="hidden"></div>
+    <div id="settings-panel" class="hidden">
+      <div class="settings-header">
+        <h2 data-i18n="settings">Settings</h2>
+        <button id="settings-close" class="icon-btn" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div class="settings-body">
+        <!-- Language -->
+        <div class="setting-group">
+          <label class="setting-label" data-i18n="language">Language</label>
+          <div class="setting-options" id="lang-options">
+            <button class="setting-opt" data-val="en">English</button>
+            <button class="setting-opt" data-val="ko">한국어</button>
+          </div>
+        </div>
+        <!-- Bible Reader -->
+        <div class="setting-group">
+          <label class="setting-label" data-i18n="bibleReader">Bible Reader</label>
+          <div class="setting-options setting-options-col" id="reader-options">
+            <button class="setting-opt" data-val="relight">Relight</button>
+            <button class="setting-opt" data-val="hangl">Hangl (Korean/English)</button>
+            <button class="setting-opt" data-val="stepbible_klb">STEP Bible (KorKLB)</button>
+            <button class="setting-opt" data-val="stepbible_hkjv">STEP Bible (KorHKJV)</button>
+          </div>
+        </div>
+        <!-- Theme -->
+        <div class="setting-group">
+          <label class="setting-label" data-i18n="theme">Theme</label>
+          <div class="setting-options" id="theme-options">
+            <button class="setting-opt" data-val="dark" data-i18n="dark">Dark</button>
+            <button class="setting-opt" data-val="light" data-i18n="light">Light</button>
+          </div>
+        </div>
+        <!-- Data -->
+        <div class="setting-group">
+          <label class="setting-label" data-i18n="data">Data</label>
+          <div class="setting-options">
+            <button class="setting-opt data-btn" id="menu-export" data-i18n="exportData">Export Data</button>
+            <button class="setting-opt data-btn" id="menu-import" data-i18n="importData">Import Data</button>
+            <input type="file" id="import-file" accept=".json" style="display:none">
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Bottom Tab Bar -->
@@ -79,7 +111,7 @@
           <div id="verse-toolbar">
             <button id="select-all-verses" class="toolbar-btn" data-i18n="selectAll">Select All</button>
             <button id="deselect-all-verses" class="toolbar-btn" data-i18n="clear">Clear</button>
-            <a id="relight-link" class="toolbar-btn relight-btn" href="#" target="_blank" rel="noopener" data-i18n="readOnRelight">Read on Relight</a>
+            <a id="reader-link" class="toolbar-btn relight-btn" href="#" target="_blank" rel="noopener" data-i18n="readNow">Read Now</a>
           </div>
           <div id="verse-grid"></div>
           <div id="verse-actions">

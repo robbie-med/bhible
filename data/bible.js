@@ -124,12 +124,82 @@ const BIBLE_DATA = {
     return this.books.find(b => b.abbr === abbr);
   },
 
+  // ===== Bible Reader URL Generators =====
+  // Each reader has its own abbreviation scheme
+
+  // hangl.net abbreviation map
+  _hanglAbbr: {
+    Gen:'Ge',Exod:'Ex',Lev:'Le',Num:'Nu',Deut:'De',
+    Josh:'Jos',Judg:'Jdg',Ruth:'Ru','1Sam':'1Sa','2Sam':'2Sa',
+    '1Kgs':'1Ki','2Kgs':'2Ki','1Chr':'1Ch','2Chr':'2Ch',
+    Ezra:'Ezr',Neh:'Ne',Esth:'Es',
+    Job:'Job',Ps:'Ps',Prov:'Pr',Eccl:'Ec',Song:'So',
+    Isa:'Isa',Jer:'Jer',Lam:'La',Ezek:'Eze',Dan:'Da',
+    Hos:'Ho',Joel:'Joe',Amos:'Am',Obad:'Ob',Jonah:'Jon',
+    Mic:'Mic',Nah:'Na',Hab:'Hab',Zeph:'Zep',Hag:'Hag',
+    Zech:'Zec',Mal:'Mal',
+    Matt:'Mt',Mark:'Mr',Luke:'Lu',John:'Joh',
+    Acts:'Ac',
+    Rom:'Ro','1Cor':'1Co','2Cor':'2Co',Gal:'Ga',
+    Eph:'Eph',Phil:'Php',Col:'Col',
+    '1Thess':'1Th','2Thess':'2Th',
+    '1Tim':'1Ti','2Tim':'2Ti',Titus:'Tit',Phlm:'Phm',
+    Heb:'Heb',Jas:'Jas','1Pet':'1Pe','2Pet':'2Pe',
+    '1John':'1Jo','2John':'2Jo','3John':'3Jo',Jude:'Jude',
+    Rev:'Re'
+  },
+
+  // Reader definitions
+  readers: {
+    relight: {
+      name: 'Relight',
+      getUrl(bookAbbr, chapter, verse) {
+        const book = BIBLE_DATA.getBook(bookAbbr);
+        if (!book) return '#';
+        if (verse) return `https://relight.app/bible/${book.relightAbbr}.${chapter}.${verse}`;
+        if (chapter) return `https://relight.app/bible/${book.relightAbbr}.${chapter}`;
+        return `https://relight.app/bible/${book.relightAbbr}`;
+      }
+    },
+    hangl: {
+      name: 'Hangl (Korean/English)',
+      getUrl(bookAbbr, chapter, verse) {
+        const abbr = BIBLE_DATA._hanglAbbr[bookAbbr] || bookAbbr;
+        if (verse) return `https://hangl.net/hbm/parallel/hrvniv/index.php/${abbr}/${chapter}/${verse}`;
+        if (chapter) return `https://hangl.net/hbm/parallel/hrvniv/index.php/${abbr}/${chapter}/`;
+        return `https://hangl.net/hbm/parallel/hrvniv/index.php/${abbr}/1/`;
+      }
+    },
+    stepbible_klb: {
+      name: 'STEP Bible (KorKLB)',
+      getUrl(bookAbbr, chapter, verse) {
+        const book = BIBLE_DATA.getBook(bookAbbr);
+        if (!book) return '#';
+        const ref = verse ? `${book.abbr}.${chapter}.${verse}` : `${book.abbr}.${chapter}`;
+        return `https://www.stepbible.org/?q=version=KorKLB@reference=${chapter ? ref : book.abbr + '.1'}`;
+      }
+    },
+    stepbible_hkjv: {
+      name: 'STEP Bible (KorHKJV)',
+      getUrl(bookAbbr, chapter, verse) {
+        const book = BIBLE_DATA.getBook(bookAbbr);
+        if (!book) return '#';
+        const ref = verse ? `${book.abbr}.${chapter}.${verse}` : `${book.abbr}.${chapter}`;
+        return `https://www.stepbible.org/?q=version=KorHKJV@reference=${chapter ? ref : book.abbr + '.1'}`;
+      }
+    }
+  },
+
+  getReaderUrl(readerId, bookAbbr, chapter, verse) {
+    const reader = this.readers[readerId];
+    if (!reader) return this.readers.relight.getUrl(bookAbbr, chapter, verse);
+    return reader.getUrl(bookAbbr, chapter, verse);
+  },
+
   getRelightUrl(bookAbbr, chapter, verse) {
-    const book = this.getBook(bookAbbr);
-    if (!book) return '#';
-    if (verse) return `https://relight.app/bible/${book.relightAbbr}.${chapter}.${verse}`;
-    if (chapter) return `https://relight.app/bible/${book.relightAbbr}.${chapter}`;
-    return `https://relight.app/bible/${book.relightAbbr}`;
+    // Legacy compat — now delegates to selected reader
+    const readerId = (typeof window !== 'undefined' && localStorage.getItem('bhible-reader')) || 'relight';
+    return this.getReaderUrl(readerId, bookAbbr, chapter, verse);
   }
 };
 

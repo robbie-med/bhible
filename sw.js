@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhible-v3';
+const CACHE_NAME = 'bhible-v4';
 const ASSETS = [
   './',
   './index.html',
