@@ -27,13 +27,13 @@
   const dom = {
     backBtn: $('#back-btn'),
     pageTitle: $('#page-title'),
-    langToggle: $('#lang-toggle'),
-    langLabel: $('#lang-label'),
-    themeToggle: $('#theme-toggle'),
-    themeIconDark: $('#theme-icon-dark'),
-    themeIconLight: $('#theme-icon-light'),
-    menuBtn: $('#menu-btn'),
-    dropdownMenu: $('#dropdown-menu'),
+    settingsBtn: $('#settings-btn'),
+    settingsPanel: $('#settings-panel'),
+    settingsOverlay: $('#settings-overlay'),
+    settingsClose: $('#settings-close'),
+    langOptions: $('#lang-options'),
+    readerOptions: $('#reader-options'),
+    themeOptions: $('#theme-options'),
     menuExport: $('#menu-export'),
     menuImport: $('#menu-import'),
     importFile: $('#import-file'),
@@ -45,7 +45,7 @@
     verseToolbar: $('#verse-toolbar'),
     selectAllBtn: $('#select-all-verses'),
     deselectAllBtn: $('#deselect-all-verses'),
-    relightLink: $('#relight-link'),
+    readerLink: $('#reader-link'),
     markReadBtn: $('#mark-read-btn'),
     legend: $('#legend'),
     testamentBtns: $$('.testament-btn'),
@@ -65,40 +65,25 @@
   function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('bhible-theme', theme);
-    dom.themeIconDark.classList.toggle('hidden', theme === 'light');
-    dom.themeIconLight.classList.toggle('hidden', theme === 'dark');
-  }
-
-  function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme') || 'dark';
-    setTheme(current === 'dark' ? 'light' : 'dark');
-    // Re-render canvases since heat map colors are theme-dependent
-    const view = state.navStack[state.navStack.length - 1] || 'books';
-    if (view === 'books') renderBookGrid();
   }
 
   // ===== Language =====
-  function updateLangLabel() {
-    dom.langLabel.textContent = I18N.lang === 'ko' ? '한' : 'EN';
-  }
-
   function applyStaticI18n() {
-    // Update all elements with data-i18n attribute
     document.querySelectorAll('[data-i18n]').forEach(el => {
       el.textContent = t(el.dataset.i18n);
     });
   }
 
-  function toggleLang() {
-    I18N.lang = I18N.lang === 'en' ? 'ko' : 'en';
-    updateLangLabel();
+  function setLang(code) {
+    I18N.lang = code;
     applyStaticI18n();
     refreshCurrentView();
+    updateSettingsHighlights();
   }
 
   function refreshCurrentView() {
     const view = state.navStack[state.navStack.length - 1] || 'books';
-    updateView(); // updates page title
+    updateView();
     if (view === 'books') {
       renderBookGrid();
     } else if (view === 'chapters') {
@@ -106,11 +91,55 @@
     } else if (view === 'verses') {
       renderVerseGrid();
     }
-    // If dashboard is active, re-render it
     if ($('#page-dashboard').classList.contains('active')) {
       renderDashboard();
       dom.pageTitle.textContent = t('dashboard');
     }
+  }
+
+  // ===== Reader Setting =====
+  function getReader() {
+    return localStorage.getItem('bhible-reader') || 'relight';
+  }
+
+  function setReader(id) {
+    localStorage.setItem('bhible-reader', id);
+    updateSettingsHighlights();
+  }
+
+  // ===== Settings Panel =====
+  function openSettings() {
+    dom.settingsOverlay.classList.remove('hidden');
+    dom.settingsPanel.classList.remove('hidden');
+    // Trigger reflow then add open class for animation
+    dom.settingsPanel.offsetHeight;
+    dom.settingsPanel.classList.add('open');
+    updateSettingsHighlights();
+  }
+
+  function closeSettings() {
+    dom.settingsPanel.classList.remove('open');
+    setTimeout(() => {
+      dom.settingsPanel.classList.add('hidden');
+      dom.settingsOverlay.classList.add('hidden');
+    }, 250);
+  }
+
+  function updateSettingsHighlights() {
+    // Language
+    dom.langOptions.querySelectorAll('.setting-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === I18N.lang);
+    });
+    // Reader
+    const readerId = getReader();
+    dom.readerOptions.querySelectorAll('.setting-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === readerId);
+    });
+    // Theme
+    const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+    dom.themeOptions.querySelectorAll('.setting-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === theme);
+    });
   }
 
   // ===== Toast =====
@@ -387,7 +416,7 @@
       dom.chapterGrid.appendChild(cell);
     });
 
-    dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook);
+    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook);
   }
 
   // ===== Verse Grid =====
@@ -404,7 +433,7 @@
       0.001
     );
 
-    dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
+    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
 
     let isDragging = false;
     let dragMode = null;
@@ -415,10 +444,10 @@
         const s = state.selectedVerses.size > 1 ? 's' : '';
         dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
         const firstVerse = Math.min(...state.selectedVerses);
-        dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
+        dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
       } else {
         dom.markReadBtn.textContent = t('markAsRead');
-        dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
+        dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
       }
     };
 
@@ -681,16 +710,7 @@
     } catch (err) {
       showToast(t('importFailed', { err: err.message }));
     }
-    closeMenu();
-  }
-
-  // ===== Menu =====
-  function toggleMenu() {
-    dom.dropdownMenu.classList.toggle('hidden');
-  }
-
-  function closeMenu() {
-    dom.dropdownMenu.classList.add('hidden');
+    closeSettings();
   }
 
   // ===== Tab Switching =====
@@ -714,9 +734,32 @@
   }
 
   // ===== Event Listeners =====
-  dom.themeToggle.addEventListener('click', toggleTheme);
-  dom.langToggle.addEventListener('click', toggleLang);
-  dom.menuBtn.addEventListener('click', toggleMenu);
+
+  // Settings panel
+  dom.settingsBtn.addEventListener('click', openSettings);
+  dom.settingsClose.addEventListener('click', closeSettings);
+  dom.settingsOverlay.addEventListener('click', closeSettings);
+
+  // Language options
+  dom.langOptions.querySelectorAll('.setting-opt').forEach(btn => {
+    btn.addEventListener('click', () => setLang(btn.dataset.val));
+  });
+
+  // Reader options
+  dom.readerOptions.querySelectorAll('.setting-opt').forEach(btn => {
+    btn.addEventListener('click', () => setReader(btn.dataset.val));
+  });
+
+  // Theme options
+  dom.themeOptions.querySelectorAll('.setting-opt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setTheme(btn.dataset.val);
+      updateSettingsHighlights();
+      renderBookGrid();
+    });
+  });
+
+  // Data export/import
   dom.menuExport.addEventListener('click', exportData);
   dom.menuImport.addEventListener('click', () => dom.importFile.click());
   dom.importFile.addEventListener('change', (e) => {
@@ -750,7 +793,7 @@
     const s = state.selectedVerses.size > 1 ? 's' : '';
     dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
     const firstVerse = Math.min(...state.selectedVerses);
-    dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
+    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
   });
 
   dom.deselectAllBtn.addEventListener('click', () => {
@@ -758,19 +801,10 @@
     dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => c.classList.remove('selected'));
     dom.markReadBtn.disabled = true;
     dom.markReadBtn.textContent = t('markAsRead');
-    dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
+    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
   });
 
   dom.markReadBtn.addEventListener('click', markSelectedAsRead);
-
-  // Close menu when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!dom.dropdownMenu.classList.contains('hidden') &&
-        !dom.menuBtn.contains(e.target) &&
-        !dom.dropdownMenu.contains(e.target)) {
-      closeMenu();
-    }
-  });
 
   // ===== Service Worker =====
   if ('serviceWorker' in navigator) {
@@ -779,9 +813,9 @@
 
   // ===== Init =====
   I18N.init();
-  updateLangLabel();
   applyStaticI18n();
   initTheme();
+  updateSettingsHighlights();
   state.navStack = ['books'];
   renderBookGrid();
 
