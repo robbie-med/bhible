@@ -1,10 +1,11 @@
-const CACHE_NAME = 'bhible-v2';
+const CACHE_NAME = 'bhible-v3';
 const ASSETS = [
   './',
   './index.html',
   './css/app.css',
   './data/bible.js',
   './js/storage.js',
+  './js/i18n.js',
   './js/app.js',
   './manifest.json',
   './icons/icon.svg',

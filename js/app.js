@@ -17,6 +17,9 @@
     navStack: [] // ['books', 'chapters', 'verses']
   };
 
+  // ===== Shorthand =====
+  const t = (key, params) => I18N.t(key, params);
+
   // ===== DOM Refs =====
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
@@ -24,6 +27,8 @@
   const dom = {
     backBtn: $('#back-btn'),
     pageTitle: $('#page-title'),
+    langToggle: $('#lang-toggle'),
+    langLabel: $('#lang-label'),
     themeToggle: $('#theme-toggle'),
     themeIconDark: $('#theme-icon-dark'),
     themeIconLight: $('#theme-icon-light'),
@@ -70,6 +75,42 @@
     // Re-render canvases since heat map colors are theme-dependent
     const view = state.navStack[state.navStack.length - 1] || 'books';
     if (view === 'books') renderBookGrid();
+  }
+
+  // ===== Language =====
+  function updateLangLabel() {
+    dom.langLabel.textContent = I18N.lang === 'ko' ? '한' : 'EN';
+  }
+
+  function applyStaticI18n() {
+    // Update all elements with data-i18n attribute
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+  }
+
+  function toggleLang() {
+    I18N.lang = I18N.lang === 'en' ? 'ko' : 'en';
+    updateLangLabel();
+    applyStaticI18n();
+    refreshCurrentView();
+  }
+
+  function refreshCurrentView() {
+    const view = state.navStack[state.navStack.length - 1] || 'books';
+    updateView(); // updates page title
+    if (view === 'books') {
+      renderBookGrid();
+    } else if (view === 'chapters') {
+      renderChapterGrid();
+    } else if (view === 'verses') {
+      renderVerseGrid();
+    }
+    // If dashboard is active, re-render it
+    if ($('#page-dashboard').classList.contains('active')) {
+      renderDashboard();
+      dom.pageTitle.textContent = t('dashboard');
+    }
   }
 
   // ===== Toast =====
@@ -122,13 +163,11 @@
     dom.backBtn.classList.toggle('hidden', showBooks);
 
     if (showBooks) {
-      dom.pageTitle.textContent = 'BHible';
+      dom.pageTitle.textContent = t('appName');
     } else if (showChapters) {
-      const book = BIBLE_DATA.getBook(state.currentBook);
-      dom.pageTitle.textContent = book ? book.name : 'Chapters';
+      dom.pageTitle.textContent = I18N.bookName(state.currentBook);
     } else if (showVerses) {
-      const book = BIBLE_DATA.getBook(state.currentBook);
-      dom.pageTitle.textContent = book ? `${book.name} ${state.currentChapter}` : 'Verses';
+      dom.pageTitle.textContent = `${I18N.bookName(state.currentBook)} ${state.currentChapter}`;
     }
   }
 
@@ -184,7 +223,7 @@
 
       const header = document.createElement('div');
       header.className = 'category-header';
-      header.textContent = category;
+      header.textContent = I18N.categoryName(category);
       section.appendChild(header);
 
       const grid = document.createElement('div');
@@ -236,10 +275,10 @@
 
         const label = document.createElement('span');
         label.className = 'book-label';
-        label.textContent = abbr;
+        label.textContent = I18N.bookAbbr(abbr);
         block.appendChild(label);
 
-        block.title = `${book.name}: ${versesRead}/${totalVerses} verses`;
+        block.title = `${I18N.bookName(abbr)}: ${versesRead}/${totalVerses}`;
 
         block.addEventListener('click', () => {
           state.currentBook = abbr;
@@ -307,13 +346,12 @@
         longPressFired = false;
         longPressTimer = setTimeout(async () => {
           longPressFired = true;
-          // Mark all verses in chapter as read
           const verses = [];
           for (let v = 1; v <= verseCount; v++) {
             verses.push({ book: state.currentBook, chapter: chNum, verse: v });
           }
           await storage.markRead(verses);
-          showToast(`${book.name} ${chNum} marked as read`);
+          showToast(t('chapterMarkedRead', { book: I18N.bookName(state.currentBook), ch: chNum }));
           renderChapterGrid();
           if (navigator.vibrate) navigator.vibrate(50);
         }, 600);
@@ -326,20 +364,18 @@
       cell.addEventListener('touchend', (e) => {
         cancelLongPress();
         if (!longPressFired) {
-          // Short tap: navigate to verses
           state.currentChapter = chNum;
           state.selectedVerses.clear();
           navigateTo('verses');
           renderVerseGrid();
         }
-        e.preventDefault(); // prevent ghost click
+        e.preventDefault();
       });
       cell.addEventListener('touchmove', cancelLongPress);
       cell.addEventListener('mousedown', startLongPress);
       cell.addEventListener('mouseup', cancelLongPress);
       cell.addEventListener('mouseleave', cancelLongPress);
 
-      // Click for desktop (mouse)
       cell.addEventListener('click', (e) => {
         if (longPressFired) return;
         state.currentChapter = chNum;
@@ -351,7 +387,6 @@
       dom.chapterGrid.appendChild(cell);
     });
 
-    // Update relight link for chapter level
     dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook);
   }
 
@@ -369,24 +404,20 @@
       0.001
     );
 
-    // Update relight link
     dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
 
-    // Drag selection state
     let isDragging = false;
-    let dragMode = null; // 'select' or 'deselect'
+    let dragMode = null;
 
     const updateMarkBtn = () => {
       dom.markReadBtn.disabled = state.selectedVerses.size === 0;
-      dom.markReadBtn.textContent = state.selectedVerses.size > 0
-        ? `Mark ${state.selectedVerses.size} Verse${state.selectedVerses.size > 1 ? 's' : ''} as Read`
-        : 'Mark as Read';
-
-      // Update relight link to first selected verse
       if (state.selectedVerses.size > 0) {
+        const s = state.selectedVerses.size > 1 ? 's' : '';
+        dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
         const firstVerse = Math.min(...state.selectedVerses);
         dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
       } else {
+        dom.markReadBtn.textContent = t('markAsRead');
         dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
       }
     };
@@ -425,11 +456,10 @@
       if (readCount > 0) {
         const dot = document.createElement('span');
         dot.className = 'read-dot';
-        dot.title = `Read ${readCount} time${readCount > 1 ? 's' : ''}`;
+        dot.title = t('readNTimes', { n: readCount, s: readCount > 1 ? 's' : '' });
         cell.appendChild(dot);
       }
 
-      // Touch/mouse drag selection
       cell.addEventListener('touchstart', (e) => {
         isDragging = true;
         dragMode = toggleVerse(v);
@@ -461,7 +491,6 @@
       dom.verseGrid.appendChild(cell);
     }
 
-    // Mouse drag on the grid container
     dom.verseGrid.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
       const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -493,8 +522,12 @@
     await storage.markRead(verses);
 
     const count = verses.length;
-    const book = BIBLE_DATA.getBook(state.currentBook);
-    showToast(`${count} verse${count > 1 ? 's' : ''} in ${book.name} ${state.currentChapter} logged`);
+    const s = count > 1 ? 's' : '';
+    showToast(t('versesLogged', {
+      n: count, s,
+      book: I18N.bookName(state.currentBook),
+      ch: state.currentChapter
+    }));
 
     if (navigator.vibrate) navigator.vibrate(30);
 
@@ -505,18 +538,18 @@
   // ===== Dashboard =====
   function renderDashboard() {
     const stats = storage.getStats();
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dayNames = I18N.dayNames();
 
     let html = '';
 
     // Overview
     html += `<div class="dash-card">
-      <h3>Overview</h3>
+      <h3>${t('overview')}</h3>
       <div class="stat-grid">
-        <div class="stat-item"><div class="stat-value">${stats.percentComplete}%</div><div class="stat-label">Complete</div></div>
-        <div class="stat-item"><div class="stat-value">${stats.uniqueVerses.toLocaleString()}</div><div class="stat-label">of ${stats.totalBibleVerses.toLocaleString()} verses</div></div>
-        <div class="stat-item"><div class="stat-value">${stats.currentStreak}</div><div class="stat-label">Current streak (days)</div></div>
-        <div class="stat-item"><div class="stat-value">${stats.longestStreak}</div><div class="stat-label">Longest streak (days)</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.percentComplete}%</div><div class="stat-label">${t('complete')}</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.uniqueVerses.toLocaleString()}</div><div class="stat-label">${t('ofNVerses', { n: stats.totalBibleVerses.toLocaleString() })}</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.currentStreak}</div><div class="stat-label">${t('currentStreak')}</div></div>
+        <div class="stat-item"><div class="stat-value">${stats.longestStreak}</div><div class="stat-label">${t('longestStreak')}</div></div>
       </div>
     </div>`;
 
@@ -524,25 +557,25 @@
     const otPct = stats.otTotal > 0 ? ((stats.otVerses / stats.otTotal) * 100).toFixed(1) : '0.0';
     const ntPct = stats.ntTotal > 0 ? ((stats.ntVerses / stats.ntTotal) * 100).toFixed(1) : '0.0';
     html += `<div class="dash-card">
-      <h3>Testament Progress</h3>
+      <h3>${t('testamentProgress')}</h3>
       <div class="progress-row">
-        <span class="progress-label">Old Testament</span>
+        <span class="progress-label">${t('oldTestament')}</span>
         <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${otPct}%"></div></div>
         <span class="progress-pct">${otPct}%</span>
       </div>
       <div class="progress-row">
-        <span class="progress-label">New Testament</span>
+        <span class="progress-label">${t('newTestament')}</span>
         <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${ntPct}%"></div></div>
         <span class="progress-pct">${ntPct}%</span>
       </div>
     </div>`;
 
     // Category Progress
-    html += `<div class="dash-card"><h3>Category Progress</h3>`;
+    html += `<div class="dash-card"><h3>${t('categoryProgress')}</h3>`;
     for (const [cat, data] of Object.entries(stats.categoryStats)) {
       const pct = data.total > 0 ? ((data.read / data.total) * 100).toFixed(1) : '0.0';
       html += `<div class="progress-row">
-        <span class="progress-label">${cat}</span>
+        <span class="progress-label">${I18N.categoryName(cat)}</span>
         <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
         <span class="progress-pct">${pct}%</span>
       </div>`;
@@ -552,7 +585,7 @@
     // Time of Day
     if (stats.totalReadings > 0) {
       const maxHour = Math.max(...stats.hourCounts, 1);
-      html += `<div class="dash-card"><h3>Reading Time of Day</h3><div class="hour-chart">`;
+      html += `<div class="dash-card"><h3>${t('readingTimeOfDay')}</h3><div class="hour-chart">`;
       for (let h = 0; h < 24; h++) {
         const pct = (stats.hourCounts[h] / maxHour) * 100;
         const showLabel = h % 4 === 0;
@@ -565,7 +598,7 @@
 
       // Day of Week
       const maxDay = Math.max(...stats.dayCounts, 1);
-      html += `<div class="dash-card"><h3>Day of Week</h3><div class="day-chart">`;
+      html += `<div class="dash-card"><h3>${t('dayOfWeek')}</h3><div class="day-chart">`;
       for (let d = 0; d < 7; d++) {
         const intensity = stats.dayCounts[d] / maxDay;
         const bg = getHeatColor(intensity > 0 ? Math.max(intensity, 0.25) : 0);
@@ -581,33 +614,34 @@
       // Monthly Activity
       const months = Object.entries(stats.daysPerMonth).sort().reverse().slice(0, 12);
       if (months.length > 0) {
-        html += `<div class="dash-card"><h3>Days Active per Month</h3><div class="months-grid">`;
+        html += `<div class="dash-card"><h3>${t('daysActivePerMonth')}</h3><div class="months-grid">`;
         for (const [month, days] of months) {
           const [y, m] = month.split('-');
-          const monthName = new Date(parseInt(y), parseInt(m) - 1).toLocaleString('default', { month: 'short', year: '2-digit' });
+          const locale = I18N.lang === 'ko' ? 'ko-KR' : 'default';
+          const monthName = new Date(parseInt(y), parseInt(m) - 1).toLocaleString(locale, { month: 'short', year: '2-digit' });
           html += `<div class="month-item">
             <div class="month-name">${monthName}</div>
             <div class="month-days">${days}</div>
-            <div class="month-suffix">days</div>
+            <div class="month-suffix">${t('days')}</div>
           </div>`;
         }
         html += `</div></div>`;
       }
 
-      // Reading milestones
+      // Milestones
       html += `<div class="dash-card">
-        <h3>Milestones</h3>
+        <h3>${t('milestones')}</h3>
         <div class="stat-grid">
-          <div class="stat-item"><div class="stat-value" style="font-size:14px">${stats.firstReading}</div><div class="stat-label">First reading</div></div>
-          <div class="stat-item"><div class="stat-value" style="font-size:14px">${stats.lastReading}</div><div class="stat-label">Last reading</div></div>
-          <div class="stat-item"><div class="stat-value">${stats.totalReadings.toLocaleString()}</div><div class="stat-label">Total verse-reads</div></div>
-          <div class="stat-item"><div class="stat-value">${stats.uniqueVerses.toLocaleString()}</div><div class="stat-label">Unique verses</div></div>
+          <div class="stat-item"><div class="stat-value" style="font-size:14px">${stats.firstReading}</div><div class="stat-label">${t('firstReading')}</div></div>
+          <div class="stat-item"><div class="stat-value" style="font-size:14px">${stats.lastReading}</div><div class="stat-label">${t('lastReading')}</div></div>
+          <div class="stat-item"><div class="stat-value">${stats.totalReadings.toLocaleString()}</div><div class="stat-label">${t('totalVerseReads')}</div></div>
+          <div class="stat-item"><div class="stat-value">${stats.uniqueVerses.toLocaleString()}</div><div class="stat-label">${t('uniqueVerses')}</div></div>
         </div>
       </div>`;
     } else {
       html += `<div class="empty-state">
-        <h3>No readings yet</h3>
-        <p>Start reading the Bible to see your stats here. Go to the Heat Map tab and select verses to log your reading.</p>
+        <h3>${t('noReadingsYet')}</h3>
+        <p>${t('noReadingsDesc')}</p>
       </div>`;
     }
 
@@ -625,9 +659,9 @@
       a.download = `bhible-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Data exported');
+      showToast(t('dataExported'));
     } catch (err) {
-      showToast('Export failed: ' + err.message);
+      showToast(t('exportFailed', { err: err.message }));
     }
     closeMenu();
   }
@@ -638,14 +672,14 @@
       const data = JSON.parse(text);
       const count = data.readings ? data.readings.length : 0;
 
-      if (confirm(`Import ${count.toLocaleString()} readings? This will merge with existing data.`)) {
+      if (confirm(t('importConfirm', { n: count.toLocaleString() }))) {
         await storage.importData(text, 'merge');
-        showToast(`${count.toLocaleString()} readings imported`);
+        showToast(t('nReadingsImported', { n: count.toLocaleString() }));
         renderBookGrid();
         renderDashboard();
       }
     } catch (err) {
-      showToast('Import failed: ' + err.message);
+      showToast(t('importFailed', { err: err.message }));
     }
     closeMenu();
   }
@@ -668,9 +702,8 @@
     if (tabName === 'dashboard') {
       renderDashboard();
       dom.backBtn.classList.add('hidden');
-      dom.pageTitle.textContent = 'Dashboard';
+      dom.pageTitle.textContent = t('dashboard');
     } else {
-      // Reset to book view when switching to heatmap
       state.navStack = ['books'];
       state.currentBook = null;
       state.currentChapter = null;
@@ -682,6 +715,7 @@
 
   // ===== Event Listeners =====
   dom.themeToggle.addEventListener('click', toggleTheme);
+  dom.langToggle.addEventListener('click', toggleLang);
   dom.menuBtn.addEventListener('click', toggleMenu);
   dom.menuExport.addEventListener('click', exportData);
   dom.menuImport.addEventListener('click', () => dom.importFile.click());
@@ -713,8 +747,8 @@
     }
     dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => c.classList.add('selected'));
     dom.markReadBtn.disabled = false;
-    dom.markReadBtn.textContent = `Mark ${state.selectedVerses.size} Verses as Read`;
-    // Update relight link
+    const s = state.selectedVerses.size > 1 ? 's' : '';
+    dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
     const firstVerse = Math.min(...state.selectedVerses);
     dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
   });
@@ -723,7 +757,7 @@
     state.selectedVerses.clear();
     dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => c.classList.remove('selected'));
     dom.markReadBtn.disabled = true;
-    dom.markReadBtn.textContent = 'Mark as Read';
+    dom.markReadBtn.textContent = t('markAsRead');
     dom.relightLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
   });
 
@@ -744,6 +778,9 @@
   }
 
   // ===== Init =====
+  I18N.init();
+  updateLangLabel();
+  applyStaticI18n();
   initTheme();
   state.navStack = ['books'];
   renderBookGrid();

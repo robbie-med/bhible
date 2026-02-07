@@ -120,6 +120,16 @@ body {
   background: var(--bg-tertiary);
 }
 
+.lang-btn {
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 36px;
+}
+
+.lang-btn span {
+  pointer-events: none;
+}
+
 /* ===== Dropdown Menu ===== */
 #dropdown-menu {
   position: absolute;
