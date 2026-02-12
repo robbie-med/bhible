@@ -1,6 +1,8 @@
 # BHible - Bible Reading Heat Map
 
 A mobile-first Progressive Web App that tracks Bible reading with a GitHub-style heat map visualization. Protestant canon (66 books), granular to the verse level.
+<img width="1005" height="885" alt="bh2" src="https://github.com/user-attachments/assets/fbab8f0d-9494-4352-a88f-c55036df1818" />
+<img width="1008" height="895" alt="bh1" src="https://github.com/user-attachments/assets/cfb45b38-2d69-41f8-8e1d-6ec89efa089d" />
 
 ## Features
 
