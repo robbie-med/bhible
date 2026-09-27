@@ -134,13 +134,20 @@
           <div id="verse-grid"></div>
           <div id="verse-actions">
             <!-- Optional context for the reading; place stays selected, sermon role resets after each log -->
+            <!-- Three independent groups (how / where / sermon); one choice or none per group -->
             <div id="context-bar">
-              <button class="ctx-chip" data-setting="personal" data-i18n="ctxPersonal">Personal</button>
-              <button class="ctx-chip" data-setting="family" data-i18n="ctxFamily">Family Worship</button>
-              <button class="ctx-chip" data-place="home" data-i18n="ctxHome">Home</button>
-              <button class="ctx-chip" data-place="church" data-i18n="ctxChurch">Church</button>
-              <button class="ctx-chip" data-sermon="main" data-i18n="ctxSermonMain">Sermon</button>
-              <button class="ctx-chip" data-sermon="support" data-i18n="ctxSermonSupport">Supporting</button>
+              <div class="ctx-group">
+                <button class="ctx-chip" data-setting="personal" data-i18n="ctxPersonal">Personal</button>
+                <button class="ctx-chip" data-setting="family" data-i18n="ctxFamily">Family Worship</button>
+              </div>
+              <div class="ctx-group">
+                <button class="ctx-chip" data-place="home" data-i18n="ctxHome">Home</button>
+                <button class="ctx-chip" data-place="church" data-i18n="ctxChurch">Church</button>
+              </div>
+              <div class="ctx-group">
+                <button class="ctx-chip" data-sermon="main" data-i18n="ctxSermonMain">Sermon</button>
+                <button class="ctx-chip" data-sermon="support" data-i18n="ctxSermonSupport">Supporting</button>
+              </div>
             </div>
             <div id="sermon-details" class="hidden">
               <input type="date" id="sermon-date" aria-label="Sermon date">

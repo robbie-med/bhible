@@ -521,21 +521,23 @@ body {
 
 /* ===== Reading context ===== */
 #context-bar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
-/* Personal / Family Worship take the first row; place and sermon chips the second */
-.ctx-chip[data-setting] {
-  flex-basis: calc(50% - 3px);
+/* Each group is a joined vertical pair, so which chips are alternatives is visible */
+.ctx-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .ctx-chip {
-  flex: 1;
+  position: relative;
   min-width: 0;
   padding: 8px 4px;
-  border-radius: 999px;
+  border-radius: 0;
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-secondary);
@@ -547,7 +549,17 @@ body {
   cursor: pointer;
 }
 
+.ctx-chip:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+.ctx-chip:last-child {
+  margin-top: -1px;
+  border-radius: 0 0 10px 10px;
+}
+
 .ctx-chip.active {
+  z-index: 1; /* keep the accent border above the neighbour's shared edge */
   border-color: var(--accent);
   background: var(--accent-dim);
   color: var(--accent);

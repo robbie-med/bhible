@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhible-v11';
+const CACHE_NAME = 'bhible-v12';
 // Bible text lives in its own cache so app updates don't evict downloaded translations.
 // Keep in sync with TEXT_CACHE in js/text.js; bump only when data/text/ is rebuilt.
 const TEXT_CACHE = 'bhible-text-v1';
@@ -79,7 +79,8 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.open(CACHE_NAME).then(cache =>
       cache.match(e.request).then(cached => {
-        const network = fetch(e.request).then(res => {
+        // no-cache: revalidate with the server (cheap 304) rather than accept the HTTP cache's copy
+        const network = fetch(e.request, { cache: 'no-cache' }).then(res => {
           if (res.ok) cache.put(e.request, res.clone());
           return res;
         });
