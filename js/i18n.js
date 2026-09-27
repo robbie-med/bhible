@@ -77,6 +77,16 @@ const I18N = {
       chapterMarkedRead: '{book} {ch} marked as read',
       undo: 'Undo',
       undone: 'Undone',
+      // Built-in reader / offline text
+      builtinReader: 'Built-in (offline)',
+      offlineBible: 'Offline Bible',
+      bothTranslations: 'Both',
+      downloadTrans: 'Download {name}',
+      downloadingTrans: '{name} {done}/{total}…',
+      downloadedTrans: '{name} ✓ offline',
+      downloadFailed: 'Download failed. Check your connection.',
+      markChapterRead: 'Mark Chapter as Read',
+      textUnavailable: "This chapter isn't downloaded yet. Connect to the internet once, or download the Bible in Settings.",
       // Reading context
       ctxHome: 'Home',
       ctxChurch: 'Church',
@@ -143,6 +153,16 @@ const I18N = {
       chapterMarkedRead: '{book} {ch}장 읽음 표시 완료',
       undo: '취소',
       undone: '취소됨',
+      // Built-in reader / offline text
+      builtinReader: '내장 성경 (오프라인)',
+      offlineBible: '오프라인 성경',
+      bothTranslations: '함께 보기',
+      downloadTrans: '{name} 다운로드',
+      downloadingTrans: '{name} {done}/{total}…',
+      downloadedTrans: '{name} ✓ 오프라인',
+      downloadFailed: '다운로드 실패. 인터넷 연결을 확인하세요.',
+      markChapterRead: '장 전체 읽음 표시',
+      textUnavailable: '이 장은 아직 다운로드되지 않았습니다. 인터넷에 한 번 연결하거나 설정에서 성경을 다운로드하세요.',
       // Reading context
       ctxHome: '집',
       ctxChurch: '교회',

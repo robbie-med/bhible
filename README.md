@@ -13,7 +13,9 @@ A mobile-first Progressive Web App that tracks Bible reading with a GitHub-style
 - **Dashboard** - Progress by testament/category, time-of-day charts, streak tracking
 - **Dark/Light Mode** - Respects system preference, toggleable
 - **Export/Import** - JSON backup of all reading data
-- **Relight Integration** - Direct links to read passages on relight.app
+- **Built-in Offline Bible** - KJV and 개역한글 (public domain), alone or side by side; download either for fully offline reading
+- **Reading Context** - Tag readings as home/church, log sermon main texts with a date, and link supporting texts to them
+- **External Readers** - Relight, Hangl, or STEP Bible instead of the built-in reader
 - **Installable PWA** - Works offline, install to home screen
 
 ## Deployment (GitHub Pages)
@@ -28,4 +30,5 @@ A mobile-first Progressive Web App that tracks Bible reading with a GitHub-style
 - Vanilla HTML/CSS/JS (no build step)
 - IndexedDB for local storage
 - Service Worker for offline support
+- `tools/build_text.py` regenerates `data/text/` (offline Bible JSON) from checksum-pinned sources
 - PWA manifest for installability

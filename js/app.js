@@ -53,6 +53,16 @@
     sermonDetails: $('#sermon-details'),
     sermonDate: $('#sermon-date'),
     sermonMainSelect: $('#sermon-main-select'),
+    textOptions: $('#text-options'),
+    downloadOptions: $('#download-options'),
+    readerPanel: $('#reader-panel'),
+    readerTitle: $('#reader-title'),
+    readerBody: $('#reader-body'),
+    readerTrans: $('#reader-trans'),
+    readerPrev: $('#reader-prev'),
+    readerNext: $('#reader-next'),
+    readerClose: $('#reader-close'),
+    readerMark: $('#reader-mark'),
     legend: $('#legend'),
     testamentBtns: $$('.testament-btn'),
     tabs: $$('.tab'),
@@ -101,11 +111,12 @@
       renderDashboard();
       dom.pageTitle.textContent = t('dashboard');
     }
+    if (readerIsOpen()) paintReader();
   }
 
   // ===== Reader Setting =====
   function getReader() {
-    return localStorage.getItem('bhible-reader') || 'relight';
+    return localStorage.getItem('bhible-reader') || 'builtin';
   }
 
   function setReader(id) {
@@ -122,6 +133,7 @@
     dom.settingsPanel.offsetHeight;
     dom.settingsPanel.classList.add('open');
     updateSettingsHighlights();
+    updateDownloadButtons();
   }
 
   function closeSettings() {
@@ -141,6 +153,11 @@
     const readerId = getReader();
     dom.readerOptions.querySelectorAll('.setting-opt').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.val === readerId);
+    });
+    // Offline text
+    const textPref = getTextPref();
+    dom.textOptions.querySelectorAll('.setting-opt').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === textPref);
     });
     // Theme
     const theme = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -194,7 +211,7 @@
       state.currentChapter = null;
       state.selectedVerses.clear();
     }
-    updateView();
+    refreshCurrentView();
   }
 
   function updateView() {
@@ -477,6 +494,7 @@
       c.classList.toggle('selected', state.selectedVerses.has(parseInt(c.dataset.verse)));
     });
     updateMarkBtn();
+    if (readerIsOpen()) paintReader();
   }
 
   // Drag-select: selection = snapshot at drag start, with anchor..current range selected/deselected.
@@ -611,6 +629,202 @@
 
     updateMarkBtn();
   }
+
+  // ===== Built-in reader =====
+  // Shows the current chapter from the offline text. Selection is shared with the verse grid.
+  function getTextPref() {
+    return localStorage.getItem('bhible-text') || (I18N.lang === 'ko' ? 'krv' : 'kjv');
+  }
+
+  function setTextPref(val) {
+    localStorage.setItem('bhible-text', val);
+    updateSettingsHighlights();
+    if (readerIsOpen()) renderReader(false);
+  }
+
+  function readerIsOpen() {
+    return !dom.readerPanel.classList.contains('hidden');
+  }
+
+  function openReader() {
+    dom.readerPanel.classList.remove('hidden');
+    history.pushState({ reader: true }, ''); // so the phone's Back button closes the reader
+    renderReader(true);
+  }
+
+  function closeReader() {
+    if (history.state && history.state.reader) history.back(); // popstate hides the panel
+    else dom.readerPanel.classList.add('hidden');
+  }
+
+  window.addEventListener('popstate', () => {
+    if (readerIsOpen()) dom.readerPanel.classList.add('hidden');
+  });
+
+  let readerRenderId = 0;
+  async function renderReader(scrollToSelection) {
+    const renderId = ++readerRenderId;
+    const abbr = state.currentBook, ch = state.currentChapter;
+    const pref = getTextPref();
+    const transList = pref === 'both' ? ['kjv', 'krv'] : [pref];
+
+    dom.readerTitle.textContent = `${I18N.bookName(abbr)} ${ch}`;
+    dom.readerTrans.textContent = pref === 'both' ? 'KJV · 한글' : BibleText.translations[pref].name;
+    dom.readerPrev.disabled = !neighborChapter(-1);
+    dom.readerNext.disabled = !neighborChapter(1);
+    updateReaderMark();
+
+    let texts;
+    try {
+      texts = await Promise.all(transList.map(tr => BibleText.chapter(tr, abbr, ch)));
+    } catch (err) {
+      if (renderId !== readerRenderId) return;
+      const msg = document.createElement('p');
+      msg.className = 'reader-error';
+      msg.textContent = t('textUnavailable');
+      dom.readerBody.replaceChildren(msg);
+      return;
+    }
+    if (renderId !== readerRenderId) return; // user already moved on
+
+    const frag = document.createDocumentFragment();
+    texts[0].forEach((_, i) => {
+      const p = document.createElement('p');
+      p.className = 'rv';
+      p.dataset.verse = i + 1;
+      const num = document.createElement('sup');
+      num.textContent = i + 1;
+      p.appendChild(num);
+      texts.forEach((chapterText, j) => {
+        const span = document.createElement('span');
+        span.className = j === 0 ? 'rv-text' : 'rv-text rv-alt';
+        span.lang = BibleText.translations[transList[j]].lang;
+        span.textContent = chapterText[i] || '—'; // omitted/merged in this translation
+        p.appendChild(span);
+      });
+      frag.appendChild(p);
+    });
+    dom.readerBody.replaceChildren(frag);
+    paintReader();
+
+    const first = state.selectedVerses.size ? Math.min(...state.selectedVerses) : null;
+    const target = scrollToSelection && first && dom.readerBody.querySelector(`[data-verse="${first}"]`);
+    if (target) target.scrollIntoView({ block: 'center' });
+    else dom.readerBody.scrollTop = 0;
+  }
+
+  // Update selected/read highlighting in place (keeps scroll position)
+  function paintReader() {
+    dom.readerBody.querySelectorAll('.rv').forEach(p => {
+      const v = parseInt(p.dataset.verse);
+      p.classList.toggle('selected', state.selectedVerses.has(v));
+      p.classList.toggle('read', storage.getVerseCount(state.currentBook, state.currentChapter, v) > 0);
+    });
+    updateReaderMark();
+  }
+
+  function updateReaderMark() {
+    const n = state.selectedVerses.size;
+    dom.readerMark.textContent = n > 0 ? t('markNVersesAsRead', { n, s: n > 1 ? 's' : '' }) : t('markChapterRead');
+  }
+
+  // Previous/next chapter, crossing book boundaries; null at Genesis 1 / Revelation 22
+  function neighborChapter(delta) {
+    const books = BIBLE_DATA.books;
+    let bi = books.findIndex(b => b.abbr === state.currentBook);
+    let ch = state.currentChapter + delta;
+    if (ch < 1) {
+      if (--bi < 0) return null;
+      ch = books[bi].chapters.length;
+    } else if (ch > books[bi].chapters.length) {
+      if (++bi >= books.length) return null;
+      ch = 1;
+    }
+    return { book: books[bi].abbr, chapter: ch };
+  }
+
+  function goToChapter(target) {
+    if (!target) return;
+    state.currentBook = target.book;
+    state.currentChapter = target.chapter;
+    state.selectedVerses.clear();
+    state.currentTestament = BIBLE_DATA.getBook(target.book).testament;
+    dom.testamentBtns.forEach(b => b.classList.toggle('active', b.dataset.testament === state.currentTestament));
+    renderChapterGrid();
+    renderVerseGrid();
+    updateView();
+    renderReader(false);
+  }
+
+  dom.readerLink.addEventListener('click', (e) => {
+    if (getReader() !== 'builtin') return; // external readers open in a new tab
+    e.preventDefault();
+    openReader();
+  });
+  dom.readerClose.addEventListener('click', closeReader);
+  dom.readerPrev.addEventListener('click', () => goToChapter(neighborChapter(-1)));
+  dom.readerNext.addEventListener('click', () => goToChapter(neighborChapter(1)));
+  dom.readerTrans.addEventListener('click', () => {
+    const order = ['kjv', 'krv', 'both'];
+    setTextPref(order[(order.indexOf(getTextPref()) + 1) % order.length]);
+  });
+  // Tap a verse to (de)select it; click never fires after a scroll
+  dom.readerBody.addEventListener('click', (e) => {
+    const p = e.target.closest('.rv');
+    if (!p) return;
+    const v = parseInt(p.dataset.verse);
+    if (state.selectedVerses.has(v)) state.selectedVerses.delete(v);
+    else state.selectedVerses.add(v);
+    paintSelection();
+  });
+  dom.readerMark.addEventListener('click', async () => {
+    if (state.selectedVerses.size === 0) {
+      const book = BIBLE_DATA.getBook(state.currentBook);
+      for (let v = 1; v <= book.chapters[state.currentChapter - 1]; v++) state.selectedVerses.add(v);
+    }
+    await markSelectedAsRead();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (!readerIsOpen()) return;
+    if (e.key === 'Escape') closeReader();
+    else if (e.key === 'ArrowLeft') goToChapter(neighborChapter(-1));
+    else if (e.key === 'ArrowRight') goToChapter(neighborChapter(1));
+  });
+
+  // ===== Offline download =====
+  async function updateDownloadButtons() {
+    for (const btn of dom.downloadOptions.querySelectorAll('[data-dl]')) {
+      if (btn.dataset.busy) continue;
+      const name = BibleText.translations[btn.dataset.dl].name;
+      const done = (await BibleText.downloadedCount(btn.dataset.dl)) >= BIBLE_DATA.books.length;
+      btn.textContent = t(done ? 'downloadedTrans' : 'downloadTrans', { name });
+      btn.classList.toggle('active', done);
+    }
+  }
+
+  dom.downloadOptions.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-dl]');
+    if (!btn || btn.dataset.busy) return;
+    const trans = btn.dataset.dl;
+    const name = BibleText.translations[trans].name;
+    btn.dataset.busy = '1';
+    // Ask the browser not to evict the offline Bible (and reading log) under storage pressure
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    try {
+      await BibleText.download(trans, (done, total) => {
+        btn.textContent = t('downloadingTrans', { name, done, total });
+      });
+      showToast(t('downloadedTrans', { name }));
+    } catch (err) {
+      showToast(t('downloadFailed'));
+    }
+    delete btn.dataset.busy;
+    updateDownloadButtons();
+  });
+
+  dom.textOptions.querySelectorAll('.setting-opt').forEach(btn => {
+    btn.addEventListener('click', () => setTextPref(btn.dataset.val));
+  });
 
   // ===== Passage references =====
   // "Romans 8:28–39", "Romans 8:1, 3–5", or "Romans 8" for a whole chapter

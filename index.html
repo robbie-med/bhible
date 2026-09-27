@@ -50,10 +50,24 @@
         <div class="setting-group">
           <label class="setting-label" data-i18n="bibleReader">Bible Reader</label>
           <div class="setting-options setting-options-col" id="reader-options">
+            <button class="setting-opt" data-val="builtin" data-i18n="builtinReader">Built-in (offline)</button>
             <button class="setting-opt" data-val="relight">Relight</button>
             <button class="setting-opt" data-val="hangl">Hangl (Korean/English)</button>
             <button class="setting-opt" data-val="stepbible_klb">STEP Bible (KorKLB)</button>
             <button class="setting-opt" data-val="stepbible_hkjv">STEP Bible (KorHKJV)</button>
+          </div>
+        </div>
+        <!-- Offline Bible text (used by the built-in reader) -->
+        <div class="setting-group">
+          <label class="setting-label" data-i18n="offlineBible">Offline Bible</label>
+          <div class="setting-options" id="text-options">
+            <button class="setting-opt" data-val="kjv">KJV</button>
+            <button class="setting-opt" data-val="krv">개역한글</button>
+            <button class="setting-opt" data-val="both" data-i18n="bothTranslations">Both</button>
+          </div>
+          <div class="setting-options" id="download-options">
+            <button class="setting-opt data-btn" data-dl="kjv"></button>
+            <button class="setting-opt data-btn" data-dl="krv"></button>
           </div>
         </div>
         <!-- Theme -->
@@ -151,11 +165,33 @@
     </main>
   </div>
 
+  <!-- Built-in reader (slides over everything) -->
+  <div id="reader-panel" class="hidden" role="dialog" aria-modal="true">
+    <header id="reader-header">
+      <button id="reader-close" class="icon-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+      <button id="reader-prev" class="icon-btn" aria-label="Previous chapter">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      </button>
+      <h2 id="reader-title"></h2>
+      <button id="reader-next" class="icon-btn" aria-label="Next chapter">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      </button>
+      <button id="reader-trans" class="toolbar-btn"></button>
+    </header>
+    <div id="reader-body"></div>
+    <div id="reader-actions">
+      <button id="reader-mark" class="primary-btn"></button>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="hidden"></div>
 
   <script src="data/bible.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/text.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
 </body>

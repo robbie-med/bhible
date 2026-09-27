@@ -66,7 +66,7 @@ const BIBLE_DATA = {
 
     // Pauline Epistles
     { name: "Romans", abbr: "Rom", relightAbbr: "Rom", testament: "NT", category: "Pauline Epistles", chapters: [32,29,31,25,21,23,25,39,33,21,36,21,14,23,33,27] },
-    { name: "1 Corinthians", abbr: "1Cor", relightAbbr: "1Cor", testament: "NT", category: "Pauline Epistles", chapters: [31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,10] },
+    { name: "1 Corinthians", abbr: "1Cor", relightAbbr: "1Cor", testament: "NT", category: "Pauline Epistles", chapters: [31,16,23,21,13,20,40,13,27,33,34,31,13,40,58,24] },
     { name: "2 Corinthians", abbr: "2Cor", relightAbbr: "2Cor", testament: "NT", category: "Pauline Epistles", chapters: [24,17,18,18,21,18,16,24,15,18,33,21,14] },
     { name: "Galatians", abbr: "Gal", relightAbbr: "Gal", testament: "NT", category: "Pauline Epistles", chapters: [24,21,29,31,26,18] },
     { name: "Ephesians", abbr: "Eph", relightAbbr: "Eph", testament: "NT", category: "Pauline Epistles", chapters: [23,22,21,32,33,24] },
@@ -151,6 +151,11 @@ const BIBLE_DATA = {
 
   // Reader definitions
   readers: {
+    // In-app reader over the offline text (js/text.js); app.js intercepts the link
+    builtin: {
+      name: 'Built-in',
+      getUrl() { return '#'; }
+    },
     relight: {
       name: 'Relight',
       getUrl(bookAbbr, chapter, verse) {
