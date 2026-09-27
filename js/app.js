@@ -68,6 +68,8 @@
     tabs: $$('.tab'),
     pages: $$('.page'),
     dashboardContent: $('#dashboard-content'),
+    content: $('#content'),
+    creedsContent: $('#creeds-content'),
     toast: $('#toast')
   };
 
@@ -110,6 +112,9 @@
     if ($('#page-dashboard').classList.contains('active')) {
       renderDashboard();
       dom.pageTitle.textContent = t('dashboard');
+    }
+    if ($('#page-creeds').classList.contains('active')) {
+      renderCreeds();
     }
     if (readerIsOpen()) paintReader();
   }
@@ -228,6 +233,7 @@
     // Testament toggle only visible in book view
     $('#testament-toggle').classList.toggle('hidden', !showBooks);
 
+    if (!$('#page-heatmap').classList.contains('active')) return;
     dom.backBtn.classList.toggle('hidden', showBooks);
 
     if (showBooks) {
@@ -826,6 +832,252 @@
     btn.addEventListener('click', () => setTextPref(btn.dataset.val));
   });
 
+  // ===== Confessions & creeds =====
+  // data/creeds/index.json + <id>.<lang>.json, built by tools/build_creeds.py
+  const creeds = { index: null, docs: {}, docId: null, lang: 'en' };
+  const esc = (str) => String(str).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function fetchJSON(url) {
+    return fetch(url).then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    });
+  }
+
+  function loadCreedDoc(id, lang) {
+    const key = `${id}.${lang}`;
+    if (!creeds.docs[key]) {
+      creeds.docs[key] = fetchJSON(`data/creeds/${key}.json`).catch(err => {
+        delete creeds.docs[key];
+        throw err;
+      });
+    }
+    return creeds.docs[key];
+  }
+
+  function creedMeta(id) {
+    return creeds.index && creeds.index.find(d => d.id === id);
+  }
+
+  function creedTitle(meta) {
+    return meta.title[I18N.lang] || meta.title.en;
+  }
+
+  function showCreedError() {
+    dom.creedsContent.innerHTML = `<p class="reader-error">${esc(t('textUnavailable'))}</p>`;
+  }
+
+  async function renderCreeds() {
+    try {
+      if (!creeds.index) creeds.index = await fetchJSON('data/creeds/index.json');
+    } catch (err) {
+      return showCreedError();
+    }
+    if (creeds.docId) return renderCreedDoc();
+
+    dom.backBtn.classList.add('hidden');
+    dom.pageTitle.textContent = t('confessionsTab');
+    let html = '';
+    for (const [type, label] of [['creed', 'creeds'], ['confession', 'confessions'], ['catechism', 'catechisms']]) {
+      html += `<div class="category-header">${esc(t(label))}</div><div class="creed-list">`;
+      for (const d of creeds.index.filter(d => d.type === type)) {
+        html += `<button class="creed-item" data-doc="${d.id}">
+          <span class="creed-title">${esc(creedTitle(d))}</span>
+          <span class="creed-year">${esc(d.year)}</span>
+        </button>`;
+      }
+      html += `</div>`;
+    }
+    dom.creedsContent.innerHTML = html;
+  }
+
+  function openCreedDoc(id) {
+    creeds.docId = id;
+    creeds.lang = I18N.lang; // falls back to English with a notice if untranslated
+    renderCreedDoc(true);
+  }
+
+  function closeCreedDoc() {
+    saveCreedScroll();
+    creeds.docId = null;
+    renderCreeds();
+    dom.content.scrollTop = 0;
+  }
+
+  function creedScrollKey() {
+    return `bhible-creed-scroll-${creeds.docId}`;
+  }
+
+  function saveCreedScroll() {
+    if (!creeds.docId) return;
+    try { localStorage.setItem(creedScrollKey(), String(Math.round(dom.content.scrollTop))); } catch (e) {}
+  }
+
+  // Footnote markers "[k]" become superscripts (only shown with proofs on)
+  function withMarkers(text) {
+    return esc(text).replace(/\[(\d+)\]/g, '<sup class="fn">$1</sup>');
+  }
+
+  function proofsHtml(proofs) {
+    const ids = Object.keys(proofs || {});
+    if (ids.length === 0) return '';
+    return `<div class="proofs">${ids.map(k => `<span class="proof-group"><sup>${esc(k)}</sup>${
+      proofs[k].map(ref => {
+        const label = refLabel(ref);
+        return label ? `<button class="ref" data-ref="${esc(ref)}">${esc(label)}</button>` : '';
+      }).join('')
+    }</span>`).join('')}</div>`;
+  }
+
+  let creedRenderId = 0;
+  async function renderCreedDoc(restoreScroll) {
+    const renderId = ++creedRenderId;
+    const meta = creedMeta(creeds.docId);
+    const lang = meta.langs.includes(creeds.lang) ? creeds.lang : 'en';
+    dom.backBtn.classList.remove('hidden');
+    dom.pageTitle.textContent = creedTitle(meta);
+
+    let doc;
+    try {
+      doc = await loadCreedDoc(meta.id, lang);
+    } catch (err) {
+      return showCreedError();
+    }
+    if (renderId !== creedRenderId) return;
+
+    const showProofs = localStorage.getItem('bhible-proofs') === '1';
+    const hasProofs = JSON.stringify(doc).includes('"proofs":{"');
+    let html = `<div class="creed-toolbar">`;
+    if (meta.langs.length > 1) {
+      html += `<div class="seg">${meta.langs.map(l =>
+        `<button class="seg-btn${l === lang ? ' active' : ''}" data-lang="${l}">${l === 'ko' ? '한국어' : 'EN'}</button>`).join('')}</div>`;
+    }
+    if (doc.questions) {
+      html += `<label class="jump">${esc(t('jumpTo'))} <input type="number" inputmode="numeric" min="1" max="${doc.questions.length}" id="creed-jump" placeholder="#"></label>`;
+    } else if (doc.chapters) {
+      html += `<select id="creed-jump" class="jump-select" aria-label="${esc(t('jumpTo'))}">${doc.chapters.map(ch =>
+        `<option value="${ch.n}">${esc(t('chapterN', { n: ch.n }))} ${esc(ch.title)}</option>`).join('')}</select>`;
+    }
+    if (hasProofs) {
+      html += `<button class="toolbar-btn proofs-toggle${showProofs ? ' active' : ''}">${esc(t('proofs'))}</button>`;
+    }
+    html += `</div>`;
+    if (lang !== creeds.lang) html += `<p class="creed-note">${esc(t('koUnavailable'))}</p>`;
+
+    html += `<div class="creed-doc${showProofs ? ' show-proofs' : ''}" lang="${lang}">`;
+    if (doc.paragraphs) {
+      html += doc.paragraphs.map(p => `<p class="creed-para">${esc(p)}</p>`).join('');
+    } else if (doc.chapters) {
+      for (const ch of doc.chapters) {
+        html += `<h3 class="cc-title" id="cc-${ch.n}">${esc(t('chapterN', { n: ch.n }))}<br>${esc(ch.title)}</h3>`;
+        for (const sec of ch.sections) {
+          html += `<div class="cs"><p><span class="cs-n">${sec.n}.</span> ${withMarkers(sec.text)}</p>${proofsHtml(sec.proofs)}</div>`;
+        }
+      }
+    } else {
+      for (const q of doc.questions) {
+        if (q.ld) html += `<h3 class="cc-title">${esc(t('lordsDay', { n: q.ld }))}</h3>`;
+        html += `<div class="cq" id="cq-${q.n}">
+          <p class="cq-q"><span class="cq-n">${esc(t('questionAbbr'))} ${q.n}.</span> ${esc(q.q)}</p>
+          <p class="cq-a"><span class="cq-n">${esc(t('answerAbbr'))}</span> ${withMarkers(q.a)}</p>
+          ${proofsHtml(q.proofs)}
+        </div>`;
+      }
+    }
+    html += `</div>`;
+    dom.creedsContent.innerHTML = html;
+
+    if (restoreScroll) {
+      let top = 0;
+      try { top = parseInt(localStorage.getItem(creedScrollKey())) || 0; } catch (e) {}
+      dom.content.scrollTop = top;
+    }
+  }
+
+  let creedScrollTimer;
+  dom.content.addEventListener('scroll', () => {
+    if (!creeds.docId || !$('#page-creeds').classList.contains('active')) return;
+    clearTimeout(creedScrollTimer);
+    creedScrollTimer = setTimeout(saveCreedScroll, 300);
+  }, { passive: true });
+
+  dom.creedsContent.addEventListener('click', (e) => {
+    const item = e.target.closest('.creed-item');
+    if (item) return openCreedDoc(item.dataset.doc);
+    const langBtn = e.target.closest('.seg-btn');
+    if (langBtn) {
+      creeds.lang = langBtn.dataset.lang;
+      return renderCreedDoc(false);
+    }
+    if (e.target.closest('.proofs-toggle')) {
+      const on = localStorage.getItem('bhible-proofs') !== '1';
+      try { localStorage.setItem('bhible-proofs', on ? '1' : '0'); } catch (err) {}
+      e.target.closest('.proofs-toggle').classList.toggle('active', on);
+      dom.creedsContent.querySelector('.creed-doc').classList.toggle('show-proofs', on);
+      return;
+    }
+    const ref = e.target.closest('.ref');
+    if (ref) openPassage(ref.dataset.ref);
+  });
+
+  dom.creedsContent.addEventListener('change', (e) => {
+    if (e.target.id !== 'creed-jump') return;
+    const n = parseInt(e.target.value);
+    const el = dom.creedsContent.querySelector(`#cq-${n}, #cc-${n}`);
+    if (el) el.scrollIntoView({ block: 'start' });
+    if (e.target.tagName === 'INPUT') e.target.blur();
+  });
+
+  // ===== Scripture references (OSIS, e.g. "Rom.11.36", "Ps.19.1-Ps.19.3", "Gen.1") =====
+  function parseOsisRef(ref) {
+    const [start, end] = ref.split('-');
+    const m = start.match(/^([1-3]?[A-Za-z]+)\.(\d+)(?:\.(\d+))?$/);
+    const book = m && BIBLE_DATA.getBook(m[1]);
+    const chapter = m && parseInt(m[2]);
+    const max = book && book.chapters[chapter - 1];
+    if (!max) return null;
+    const from = m[3] ? Math.min(parseInt(m[3]), max) : 1;
+    let to = m[3] ? from : max;
+    let endChapter = chapter, endVerse = null;
+    const e = end && end.match(/(?:[1-3]?[A-Za-z]+\.)?(\d+)(?:\.(\d+))?$/);
+    if (e) {
+      endChapter = e[2] ? parseInt(e[1]) : chapter;
+      endVerse = parseInt(e[2] || e[1]);
+      to = endChapter === chapter ? Math.min(Math.max(endVerse, from), max) : max; // cross-chapter: rest of the first chapter
+    }
+    return { book: m[1], chapter, from, to, whole: !m[3], endChapter, endVerse };
+  }
+
+  function refLabel(ref) {
+    const r = parseOsisRef(ref);
+    if (!r) return null;
+    const name = I18N.lang === 'ko' ? I18N.bookAbbr(r.book) : r.book;
+    if (r.whole) return `${name} ${r.chapter}`;
+    if (r.endChapter !== r.chapter) return `${name} ${r.chapter}:${r.from}–${r.endChapter}:${r.endVerse}`;
+    return `${name} ${r.chapter}:${r.from}${r.to > r.from ? `–${r.to}` : ''}`;
+  }
+
+  // Open a passage in the chosen reader with its verses selected (ready to Mark as Read)
+  function openPassage(ref) {
+    const r = parseOsisRef(ref);
+    if (!r) return;
+    const readerId = getReader();
+    if (readerId !== 'builtin') {
+      window.open(BIBLE_DATA.getReaderUrl(readerId, r.book, r.chapter, r.whole ? null : r.from), '_blank', 'noopener');
+      return;
+    }
+    state.currentBook = r.book;
+    state.currentChapter = r.chapter;
+    state.selectedVerses = r.whole ? new Set() : new Set(Array.from({ length: r.to - r.from + 1 }, (_, i) => r.from + i));
+    state.currentTestament = BIBLE_DATA.getBook(r.book).testament;
+    dom.testamentBtns.forEach(b => b.classList.toggle('active', b.dataset.testament === state.currentTestament));
+    state.navStack = ['books', 'chapters', 'verses'];
+    renderChapterGrid();
+    renderVerseGrid();
+    updateView();
+    openReader();
+  }
+
   // ===== Passage references =====
   // "Romans 8:28–39", "Romans 8:1, 3–5", or "Romans 8" for a whole chapter
   function formatRef(bookAbbr, chapter, verses) {
@@ -1118,6 +1370,8 @@
       renderDashboard();
       dom.backBtn.classList.add('hidden');
       dom.pageTitle.textContent = t('dashboard');
+    } else if (tabName === 'creeds') {
+      renderCreeds();
     } else {
       state.navStack = ['books'];
       state.currentBook = null;
@@ -1162,7 +1416,10 @@
     e.target.value = '';
   });
 
-  dom.backBtn.addEventListener('click', navigateBack);
+  dom.backBtn.addEventListener('click', () => {
+    if ($('#page-creeds').classList.contains('active')) closeCreedDoc();
+    else navigateBack();
+  });
 
   dom.testamentBtns.forEach(btn => {
     btn.addEventListener('click', () => {

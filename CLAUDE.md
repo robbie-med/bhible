@@ -10,6 +10,8 @@ BHible is a mobile-first PWA that tracks Bible reading (66-book Protestant canon
 
 There's no build step, package manager, linter or test suite. It's plain HTML/CSS/JS, loaded as ordered `<script>` tags (no modules, no bundler). The one generator is `python3 tools/build_text.py`. It rebuilds the offline Bible JSON in `data/text/` from checksum-pinned public-domain sources (KJV from layeh/kjv, 개역한글 from CrossWire KorRV via scrollmapper), cached in the gitignored `tools/.sources/`. It reads verse counts from `data/bible.js`, so every text file lines up with the heat map. Verses a translation omits become `""`. If you rebuild, bump `TEXT_CACHE` in both `sw.js` and `js/text.js`.
 
+`python3 tools/build_creeds.py` rebuilds `data/creeds/` (index plus `<id>.<lang>.json`) from a pinned Creeds.json commit (public-domain English). Korean versions are hand-placed files in `tools/creeds_ko/<id>.json` with the same shape. It also rewrites the `// creeds:begin … creeds:end` precache block in `sw.js`, so don't edit that block by hand.
+
 To run it locally, serve the repo root over HTTP. You need a real server, not `file://`, because the service worker and IndexedDB need it. Port **3606** is registered to bhible in `/home/user/Projects/PORTS.md`. Don't pick another port:
 
 ```bash
@@ -33,4 +35,5 @@ Script load order in `index.html` matters. Each file publishes a global that lat
    - **Heat coloring** buckets `count / maxCount` into 5 levels, mapped to the CSS vars `--heat-0..4`. `getHeatRGB` duplicates those colors as raw RGB for canvas drawing, so update both if you change the palette.
    - **Verse selection** uses tap, drag-select (touch and mouse), and long-press on a chapter to mark the whole chapter read.
    - **Dashboard** is rendered as an HTML string from `storage.getStats()`.
+   - **Confessions tab** (`renderCreeds`/`renderCreedDoc`) renders three document shapes: creed `paragraphs`, confession `chapters[].sections[]`, and catechism `questions[]`. Heidelberg questions carry `ld` (Lord's Day). Footnote markers `[k]` in the text map to `proofs[k]`, a list of OSIS refs. `parseOsisRef` and `openPassage` open a proof in the reader with its verses pre-selected. The shared header's back button is routed by the active tab, and `updateView()` leaves the header alone unless the Heat Map tab is active.
    - User preferences live in `localStorage`: `bhible-theme`, `bhible-lang`, `bhible-reader`, `bhible-text`. Theme is applied as `data-theme` on `<html>`, and `css/app.css` overrides variables under `[data-theme="light"]`.

@@ -1039,3 +1039,213 @@ body {
   border-top: 1px solid var(--border);
   display: flex;
 }
+
+/* ===== Confessions ===== */
+.creed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.creed-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.creed-item:active {
+  transform: scale(0.99);
+}
+
+.creed-year {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.creed-toolbar {
+  position: sticky;
+  top: -12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -12px -12px 12px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.creed-toolbar:empty {
+  display: none;
+}
+
+.seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.seg-btn {
+  padding: 6px 12px;
+  border: none;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.seg-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.jump {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.jump input,
+.jump-select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.jump input {
+  width: 64px;
+}
+
+.jump-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.proofs-toggle {
+  margin-left: auto;
+}
+
+.proofs-toggle.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.creed-note {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.creed-doc {
+  max-width: 720px;
+  margin: 0 auto;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.creed-doc[lang="ko"] {
+  word-break: keep-all;
+}
+
+.creed-para {
+  margin-bottom: 14px;
+}
+
+.cc-title {
+  margin: 22px 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.4;
+  scroll-margin-top: 60px;
+}
+
+.cs,
+.cq {
+  margin-bottom: 16px;
+  scroll-margin-top: 60px;
+}
+
+.cs-n,
+.cq-n {
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.cq-q {
+  font-weight: 600;
+}
+
+.cq-a {
+  margin-top: 2px;
+}
+
+.creed-doc sup.fn,
+.creed-doc .proofs {
+  display: none;
+}
+
+.creed-doc.show-proofs sup.fn {
+  display: inline;
+  font-size: 10px;
+  color: var(--accent);
+  margin-left: 1px;
+}
+
+.creed-doc.show-proofs .proofs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.proof-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.proof-group sup {
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.ref {
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ref:active {
+  background: var(--accent-dim);
+}

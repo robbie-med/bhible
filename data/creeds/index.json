@@ -1,0 +1,111 @@
+[
+ {
+  "id": "apostles",
+  "type": "creed",
+  "year": "c. 700",
+  "title": {
+   "en": "Apostles' Creed",
+   "ko": "사도신경"
+  },
+  "langs": [
+   "en",
+   "ko"
+  ]
+ },
+ {
+  "id": "nicene",
+  "type": "creed",
+  "year": "381",
+  "title": {
+   "en": "Nicene Creed",
+   "ko": "니케아 신경"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "athanasian",
+  "type": "creed",
+  "year": "c. 500",
+  "title": {
+   "en": "Athanasian Creed",
+   "ko": "아타나시우스 신경"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "chalcedon",
+  "type": "creed",
+  "year": "451",
+  "title": {
+   "en": "Chalcedonian Definition",
+   "ko": "칼케돈 신경"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "wcf",
+  "type": "confession",
+  "year": "1646",
+  "title": {
+   "en": "Westminster Confession of Faith",
+   "ko": "웨스트민스터 신앙고백"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "wlc",
+  "type": "catechism",
+  "year": "1647",
+  "title": {
+   "en": "Westminster Larger Catechism",
+   "ko": "웨스트민스터 대요리문답"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "wsc",
+  "type": "catechism",
+  "year": "1647",
+  "title": {
+   "en": "Westminster Shorter Catechism",
+   "ko": "웨스트민스터 소요리문답"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "heidelberg",
+  "type": "catechism",
+  "year": "1563",
+  "title": {
+   "en": "Heidelberg Catechism",
+   "ko": "하이델베르크 요리문답"
+  },
+  "langs": [
+   "en"
+  ]
+ },
+ {
+  "id": "lbc1689",
+  "type": "confession",
+  "year": "1689",
+  "title": {
+   "en": "1689 London Baptist Confession",
+   "ko": "1689 런던 침례교 신앙고백"
+  },
+  "langs": [
+   "en"
+  ]
+ }
+]
