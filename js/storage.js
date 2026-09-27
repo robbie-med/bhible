@@ -122,6 +122,7 @@ class BibleStorage {
       book: verses[0].book,
       chapter: verses[0].chapter,
       verses: verses.map(v => v.verse),
+      setting: context.setting || null, // 'personal' | 'family' (family worship)
       place: context.place || null,
       sermonRole: context.sermonRole || null,
       sermonDate: context.sermonRole ? (context.sermonDate || localDateKey(timestamp)) : null,
@@ -428,9 +429,10 @@ class BibleStorage {
       }
     }
 
-    const placeCounts = { home: 0, church: 0 };
+    const placeCounts = { home: 0, church: 0, personal: 0, family: 0 };
     for (const se of this.sessions) {
       if (se.place in placeCounts) placeCounts[se.place]++;
+      if (se.setting in placeCounts) placeCounts[se.setting]++;
     }
 
     return {

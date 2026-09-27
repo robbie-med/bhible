@@ -16,7 +16,7 @@
     selectedVerses: new Set(),
     navStack: [], // ['books', 'chapters', 'verses']
     // Reading context for the next "Mark as Read". place sticks until changed; sermonRole resets after each log.
-    context: { place: null, sermonRole: null }
+    context: { setting: null, place: null, sermonRole: null }
   };
 
   // ===== Shorthand =====
@@ -1098,7 +1098,8 @@
   function updateContextBar() {
     const ctx = state.context;
     dom.contextBar.querySelectorAll('.ctx-chip').forEach(chip => {
-      const on = chip.dataset.place ? chip.dataset.place === ctx.place : chip.dataset.sermon === ctx.sermonRole;
+      const on = chip.dataset.setting ? chip.dataset.setting === ctx.setting
+        : chip.dataset.place ? chip.dataset.place === ctx.place : chip.dataset.sermon === ctx.sermonRole;
       chip.classList.toggle('active', on);
     });
     dom.sermonDetails.classList.toggle('hidden', !ctx.sermonRole);
@@ -1130,7 +1131,9 @@
     const chip = e.target.closest('.ctx-chip');
     if (!chip) return;
     const ctx = state.context;
-    if (chip.dataset.place) {
+    if (chip.dataset.setting) {
+      ctx.setting = ctx.setting === chip.dataset.setting ? null : chip.dataset.setting;
+    } else if (chip.dataset.place) {
       ctx.place = ctx.place === chip.dataset.place ? null : chip.dataset.place;
     } else {
       ctx.sermonRole = ctx.sermonRole === chip.dataset.sermon ? null : chip.dataset.sermon;
@@ -1168,7 +1171,7 @@
     }));
     state.selectedVerses.clear();
 
-    const context = { place: state.context.place, sermonRole: state.context.sermonRole };
+    const context = { setting: state.context.setting, place: state.context.place, sermonRole: state.context.sermonRole };
     if (context.sermonRole) {
       context.sermonDate = dom.sermonDate.value || localDateKey(Date.now());
       if (context.sermonRole === 'support') context.sermonMain = Number(dom.sermonMainSelect.value) || null;
@@ -1294,13 +1297,15 @@
       }
 
       // Where
-      const { home, church } = stats.placeCounts;
-      if (home + church > 0) {
+      const { home, church, personal, family } = stats.placeCounts;
+      if (home + church + personal + family > 0) {
         html += `<div class="dash-card">
           <h3>${t('whereRead')}</h3>
           <div class="stat-grid">
             <div class="stat-item"><div class="stat-value">${home}</div><div class="stat-label">${t('ctxHome')}</div></div>
             <div class="stat-item"><div class="stat-value">${church}</div><div class="stat-label">${t('ctxChurch')}</div></div>
+            <div class="stat-item"><div class="stat-value">${personal}</div><div class="stat-label">${t('ctxPersonal')}</div></div>
+            <div class="stat-item"><div class="stat-value">${family}</div><div class="stat-label">${t('ctxFamily')}</div></div>
           </div>
         </div>`;
       }

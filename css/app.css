@@ -522,7 +522,13 @@ body {
 /* ===== Reading context ===== */
 #context-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+}
+
+/* Personal / Family Worship take the first row; place and sermon chips the second */
+.ctx-chip[data-setting] {
+  flex-basis: calc(50% - 3px);
 }
 
 .ctx-chip {

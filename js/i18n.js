@@ -100,6 +100,8 @@ const I18N = {
       jumpTo: 'Go to',
       koUnavailable: 'Korean translation not available yet. Showing English.',
       // Reading context
+      ctxPersonal: 'Personal',
+      ctxFamily: 'Family Worship',
       ctxHome: 'Home',
       ctxChurch: 'Church',
       ctxSermonMain: 'Sermon',
@@ -188,6 +190,8 @@ const I18N = {
       jumpTo: '이동',
       koUnavailable: '한국어 번역이 아직 없어 영어로 표시합니다.',
       // Reading context
+      ctxPersonal: '개인',
+      ctxFamily: '가정예배',
       ctxHome: '집',
       ctxChurch: '교회',
       ctxSermonMain: '설교 본문',

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhible-v10';
+const CACHE_NAME = 'bhible-v11';
 // Bible text lives in its own cache so app updates don't evict downloaded translations.
 // Keep in sync with TEXT_CACHE in js/text.js; bump only when data/text/ is rebuilt.
 const TEXT_CACHE = 'bhible-text-v1';
