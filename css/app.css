@@ -79,7 +79,7 @@ body {
 #top-bar {
   display: flex;
   align-items: center;
-  height: var(--header-h);
+  height: calc(var(--header-h) + var(--safe-top)); /* padding-top eats into height (border-box) */
   padding: 0 12px;
   padding-top: var(--safe-top);
   background: var(--bg-secondary);
@@ -958,7 +958,7 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  min-height: var(--header-h);
+  min-height: calc(var(--header-h) + var(--safe-top));
   padding: var(--safe-top) 8px 0;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
