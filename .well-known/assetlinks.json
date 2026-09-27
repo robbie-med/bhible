@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.robbiemed.bhible",
+      "sha256_cert_fingerprints": [
+        "05:79:85:29:FC:7C:43:6D:83:B5:D3:41:E2:E2:86:9E:E7:EC:48:D8:D4:F3:8E:4A:1B:FD:77:08:98:AD:F0:CB"
+      ]
+    }
+  }
+]

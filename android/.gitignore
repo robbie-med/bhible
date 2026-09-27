@@ -1,0 +1,10 @@
+# Signing — never commit. keystore.properties.example is the tracked template.
+*.keystore
+*.jks
+keystore.properties
+
+# Build output
+build/
+.gradle/
+local.properties
+*.apk

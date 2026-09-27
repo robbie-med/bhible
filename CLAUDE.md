@@ -22,6 +22,10 @@ python3 -m http.server 3606 --bind 127.0.0.1
 
 **Touch gestures:** gesture handling is load-bearing, and scrolling must never select anything. Chapter cells open on `click`, which browsers suppress after a scroll; holding still for 600ms marks the whole chapter read. Verse cells: tap toggles, a swipe scrolls, and a 250ms hold then drag selects a range (`touchmove` only calls `preventDefault` once a drag is active). All grid listeners are delegated and bound once, outside the render functions. Don't add per-cell listeners inside `render*()`.
 
+## Android app (`android/`)
+
+This is a Trusted Web Activity shell (package `org.robbiemed.bhible`, androidbrowserhelper) that opens https://bhible.robbiemed.org full-screen in Chrome. It shares Chrome's storage for that origin, so app changes ship by pushing the site. Rebuild the APK only when the shell changes (name, icon, URL), and bump `versionCode` when you do. Build and verify with `android/release.sh` (`--install` for a connected phone). It checks that the signing cert matches `/.well-known/assetlinks.json`; without that match Chrome shows a URL bar. The signing key `android/release.keystore` and `android/keystore.properties` are gitignored and must be backed up: losing them means installs can't be upgraded. `.nojekyll` must stay at the repo root so Pages serves `/.well-known/`. IPv6 is broken on this host, so `gradle.properties` forces IPv4 for the build JVM.
+
 ## Architecture
 
 Script load order in `index.html` matters. Each file publishes a global that later files use:
