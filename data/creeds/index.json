@@ -107,5 +107,17 @@
   "langs": [
    "en"
   ]
+ },
+ {
+  "id": "didache",
+  "type": "early",
+  "year": "c. 100",
+  "title": {
+   "en": "Didache",
+   "ko": "디다케"
+  },
+  "langs": [
+   "en"
+  ]
  }
 ]

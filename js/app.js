@@ -878,7 +878,7 @@
     dom.backBtn.classList.add('hidden');
     dom.pageTitle.textContent = t('confessionsTab');
     let html = '';
-    for (const [type, label] of [['creed', 'creeds'], ['confession', 'confessions'], ['catechism', 'catechisms']]) {
+    for (const [type, label] of [['creed', 'creeds'], ['confession', 'confessions'], ['catechism', 'catechisms'], ['early', 'earlyChurch']]) {
       html += `<div class="category-header">${esc(t(label))}</div><div class="creed-list">`;
       for (const d of creeds.index.filter(d => d.type === type)) {
         html += `<button class="creed-item" data-doc="${d.id}">

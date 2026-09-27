@@ -6,18 +6,24 @@
     creed       {paragraphs: [text]}
     confession  {chapters: [{n, title, sections: [{n, text, proofs}]}]}
     catechism   {questions: [{n, q, a, proofs, ld?}]}   (ld = Heidelberg Lord's Day)
+  The index type "early" (Didache) uses the confession shape; the app groups it as Early Church.
 
 `text`/`a` may contain footnote markers "[k]"; `proofs` maps k -> [OSIS refs] such as
 "Rom.11.36", "Ps.19.1-Ps.19.3" or "Gen.1" (book ids match data/bible.js).
 
-English: NonlinearFruit/Creeds.json @ 2ae21a4 (public-domain texts only), except the
-Apostles' Creed, which uses the traditional 1662 Book of Common Prayer wording.
+English: NonlinearFruit/Creeds.json @ 2ae21a4 (public-domain texts only), except
+  - the Apostles' Creed: traditional 1662 Book of Common Prayer wording;
+  - the Didache: Roberts-Donaldson translation (Ante-Nicene Fathers vol. VII, 1886) from
+    Wikisource, editors' footnotes removed. Downloaded pages are cached with their
+    revision ids in tools/.sources/creeds/didache/.
 Korean: tools/creeds_ko/<id>.json in the same shape, when present.
 
 Usage: python3 tools/build_creeds.py
 """
+import html
 import json
 import re
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -38,7 +44,12 @@ DOCS = [
     ("wsc", "catechism", "1647", "westminster_shorter_catechism", "Westminster Shorter Catechism", "웨스트민스터 소요리문답"),
     ("heidelberg", "catechism", "1563", "heidelberg_catechism", "Heidelberg Catechism", "하이델베르크 요리문답"),
     ("lbc1689", "confession", "1689", "london_baptist_1689", "1689 London Baptist Confession", "1689 런던 침례교 신앙고백"),
+    ("didache", "early", "c. 100", None, "Didache", "디다케"),
 ]
+
+DIDACHE_PAGE = ("Ante-Nicene Fathers/Volume VII/The Teaching of the Twelve Apostles/"
+                "The Teaching of the Twelve Apostles/Chapter ")
+ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI"]
 
 APOSTLES_EN = [
     "I believe in God the Father Almighty, Maker of heaven and earth:",
@@ -66,6 +77,61 @@ def fetch(name):
         print(f"downloading {name}")
         urllib.request.urlretrieve(BASE + f"{name}.json", dest)
     return json.loads(dest.read_text(encoding="utf-8"))
+
+
+def wikitext(title):
+    """Wikisource page source, cached with its revision id."""
+    dest = SRC / "didache" / (title.rsplit("/", 1)[-1].replace(" ", "_") + ".json")
+    if not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        print(f"downloading {title}")
+        query = urllib.parse.urlencode({"action": "parse", "page": title, "prop": "wikitext|revid",
+                                        "format": "json", "formatversion": 2})
+        # Wikimedia APIs refuse requests without a descriptive User-Agent
+        req = urllib.request.Request("https://en.wikisource.org/w/api.php?" + query,
+                                     headers={"User-Agent": "bhible-build/1.0 (https://github.com/robbie-med/bhible)"})
+        with urllib.request.urlopen(req) as res:
+            parsed = json.load(res)["parse"]
+        dest.write_text(json.dumps({"revid": parsed["revid"], "wikitext": parsed["wikitext"]}), encoding="utf-8")
+    return json.loads(dest.read_text(encoding="utf-8"))["wikitext"]
+
+
+def clean_wiki(text):
+    text = re.sub(r"<ref[^>]*>.*?</ref>", "", text, flags=re.S)       # editors' footnotes
+    text = re.sub(r"\{\{anchor\+\|[^|}]*\|2=([^}]*)\}\}", r"\1", text)
+    text = re.sub(r"\{\{(?:small-caps|sc|bbsc)\|([^}]*)\}\}", r"\1", text)
+    text = re.sub(r"\{\{[^}]*\}\}", "", text)                         # any other template
+    text = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", text)      # [[target|label]] -> label
+    text = text.replace("'''", "").replace("''", "")
+    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+
+def didache():
+    chapters = []
+    for n, roman in enumerate(ROMAN, 1):
+        # Footnotes first: chapter IX's heading itself carries a multi-line <ref>
+        src = re.sub(r"<ref[^>]*>.*?</ref>", "", wikitext(DIDACHE_PAGE + roman), flags=re.S)
+        m = re.search(r"'''\{\{bbsc\|(.*?)\}\}'''", src, flags=re.S)  # the bold "Chapter N.—Title." line
+        assert m, f"Didache chapter {n}: heading not found"
+        title = clean_wiki(m.group(1))
+        text = src[m.end():].split("==Footnotes==")[0]
+        title = re.sub(r"^Chapter [IVXL]+\.\s*[—-]\s*", "", title).rstrip(".")
+        text = clean_wiki(text)
+        # Split on verse numbers "1. ", "2. ", ... taking only the next expected number,
+        # so stray numerals in the text can't start a section
+        starts, expect = [], 1
+        for m in re.finditer(r"(?:(?<=\s)|^)(\d{1,2})\. ", text):
+            if int(m.group(1)) == expect:
+                starts.append((m.start(), m.end()))
+                expect += 1
+        assert starts, f"Didache chapter {n}: no numbered verses"
+        sections = [{
+            "n": i + 1,
+            "text": text[body_start:(starts[i + 1][0] if i + 1 < len(starts) else len(text))].strip(),
+            "proofs": {},
+        } for i, (_, body_start) in enumerate(starts)]
+        chapters.append({"n": n, "title": title, "sections": sections})
+    return {"chapters": chapters}
 
 
 def proofs(entry):
@@ -110,6 +176,8 @@ def main():
     for doc_id, doc_type, year, source, title_en, title_ko in DOCS:
         if source:
             doc = convert(doc_type, fetch(source)["Data"])
+        elif doc_id == "didache":
+            doc = didache()
         else:
             doc = {"paragraphs": APOSTLES_EN}
         if doc_id == "heidelberg":

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhible-v12';
+const CACHE_NAME = 'bhible-v13';
 // Bible text lives in its own cache so app updates don't evict downloaded translations.
 // Keep in sync with TEXT_CACHE in js/text.js; bump only when data/text/ is rebuilt.
 const TEXT_CACHE = 'bhible-text-v1';
@@ -27,7 +27,8 @@ const ASSETS = [
   './data/creeds/wlc.en.json',
   './data/creeds/wsc.en.json',
   './data/creeds/heidelberg.en.json',
-  './data/creeds/lbc1689.en.json'
+  './data/creeds/lbc1689.en.json',
+  './data/creeds/didache.en.json'
   // creeds:end
 ];
 
