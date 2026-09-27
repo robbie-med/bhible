@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build, verify and (optionally) install the BHible Android app.
 #
-# The APK is only a Trusted Web Activity shell around https://bhible.robbiemed.org,
+# The APK is only a WebView shell around https://bhible.robbiemed.org (MainActivity),
 # so app changes ship by pushing the site. Rebuild this only when the shell itself
-# changes (icon, name, URL); bump versionCode in app/build.gradle.kts when you do.
+# changes (icon, name, URL, native bridges); bump versionCode in app/build.gradle.kts.
 #
 #   ./release.sh              build + verify, copy to BHible.apk
 #   ./release.sh --install    also install on the connected device
@@ -29,14 +29,14 @@ tool()  { ls "$ANDROID_HOME"/build-tools/*/"$1" | tail -1; }
 
 [[ -f keystore.properties ]] || fail "keystore.properties missing (see keystore.properties.example).
       An unsigned or differently signed APK won't upgrade an existing install
-      and won't match /.well-known/assetlinks.json, so the URL bar would show."
+      and won't match /.well-known/assetlinks.json (used to verify app links)."
 
 # IPv6 is broken on this host; preferIPv4Stack is also set for the build JVM in gradle.properties
 ./gradlew assembleRelease --no-daemon -Djava.net.preferIPv4Stack=true -q
 [[ -f $APK ]] || fail "no APK produced"
 ok "built $(du -h "$APK" | cut -f1) APK, versionCode $(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)"
 
-# Signing key must be the one the site vouches for, or Chrome shows a URL bar
+# Signing key must be the one the site vouches for (Android app-link verification)
 CERT=$("$(tool apksigner)" verify --print-certs "$APK" | grep -m1 'SHA-256 digest' | awk '{print $NF}')
 LINKED=$(grep -oE '([0-9A-F]{2}:){31}[0-9A-F]{2}' ../.well-known/assetlinks.json | tr -d ':' | tr 'A-F' 'a-f')
 [[ -n "$CERT" ]] || fail "APK is unsigned"
@@ -51,10 +51,10 @@ else
 fi
 
 PERMS=$("$(tool aapt2)" dump permissions "$APK" | grep '^uses-permission' \
-        | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)
+        | grep -v -e 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' -e "name='android.permission.INTERNET'" || true)
 [[ -z "$PERMS" ]] || fail "APK declares unexpected permissions:
 $PERMS"
-ok "no permissions"
+ok "permissions: INTERNET only"
 
 cp "$APK" BHible.apk
 ok "copied to android/BHible.apk"

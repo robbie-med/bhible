@@ -1329,11 +1329,18 @@
   async function exportData() {
     try {
       const json = await storage.exportData();
+      const filename = `bhible-export-${new Date().toISOString().slice(0, 10)}.json`;
+      // Android app (WebView) can't download blobs; it offers a native save dialog instead
+      if (window.BHibleAndroid) {
+        window.BHibleAndroid.saveFile(filename, json);
+        closeSettings();
+        return;
+      }
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bhible-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       showToast(t('dataExported'));

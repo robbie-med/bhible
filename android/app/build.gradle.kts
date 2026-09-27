@@ -20,8 +20,8 @@ android {
         applicationId = "org.robbiemed.bhible"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 5
+        versionName = "1.1"
     }
 
     signingConfigs {
@@ -50,7 +50,3 @@ android {
     }
 }
 
-dependencies {
-    // Trusted Web Activity launcher: opens https://bhible.robbiemed.org full-screen in Chrome
-    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.7.3")
-}
