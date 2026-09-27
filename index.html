@@ -115,6 +115,17 @@
           </div>
           <div id="verse-grid"></div>
           <div id="verse-actions">
+            <!-- Optional context for the reading; place stays selected, sermon role resets after each log -->
+            <div id="context-bar">
+              <button class="ctx-chip" data-place="home" data-i18n="ctxHome">Home</button>
+              <button class="ctx-chip" data-place="church" data-i18n="ctxChurch">Church</button>
+              <button class="ctx-chip" data-sermon="main" data-i18n="ctxSermonMain">Sermon</button>
+              <button class="ctx-chip" data-sermon="support" data-i18n="ctxSermonSupport">Supporting</button>
+            </div>
+            <div id="sermon-details" class="hidden">
+              <input type="date" id="sermon-date" aria-label="Sermon date">
+              <select id="sermon-main-select" aria-label="Main sermon text"></select>
+            </div>
             <button id="mark-read-btn" class="primary-btn" disabled data-i18n="markAsRead">Mark as Read</button>
           </div>
         </div>

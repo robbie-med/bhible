@@ -510,12 +510,93 @@ body {
 
 #verse-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   position: sticky;
   bottom: -12px; /* sit flush against #content's bottom padding */
   padding: 10px 0 12px;
   background: var(--bg-primary);
   z-index: 5;
+}
+
+/* ===== Reading context ===== */
+#context-bar {
+  display: flex;
+  gap: 6px;
+}
+
+.ctx-chip {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.ctx-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+#sermon-details {
+  display: flex;
+  gap: 6px;
+}
+
+#sermon-details input,
+#sermon-details select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  color-scheme: dark;
+}
+
+[data-theme="light"] #sermon-details input,
+[data-theme="light"] #sermon-details select {
+  color-scheme: light;
+}
+
+#sermon-details input {
+  flex: 0 0 auto;
+}
+
+.sermon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sermon-item {
+  font-size: 14px;
+}
+
+.sermon-date {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.sermon-main {
+  font-weight: 600;
+}
+
+.sermon-support {
+  color: var(--text-secondary);
+  padding-left: 8px;
 }
 
 .primary-btn {

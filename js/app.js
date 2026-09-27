@@ -14,7 +14,9 @@
     currentBook: null,
     currentChapter: null,
     selectedVerses: new Set(),
-    navStack: [] // ['books', 'chapters', 'verses']
+    navStack: [], // ['books', 'chapters', 'verses']
+    // Reading context for the next "Mark as Read". place sticks until changed; sermonRole resets after each log.
+    context: { place: null, sermonRole: null }
   };
 
   // ===== Shorthand =====
@@ -47,6 +49,10 @@
     deselectAllBtn: $('#deselect-all-verses'),
     readerLink: $('#reader-link'),
     markReadBtn: $('#mark-read-btn'),
+    contextBar: $('#context-bar'),
+    sermonDetails: $('#sermon-details'),
+    sermonDate: $('#sermon-date'),
+    sermonMainSelect: $('#sermon-main-select'),
     legend: $('#legend'),
     testamentBtns: $$('.testament-btn'),
     tabs: $$('.tab'),
@@ -606,11 +612,75 @@
     updateMarkBtn();
   }
 
+  // ===== Passage references =====
+  // "Romans 8:28–39", "Romans 8:1, 3–5", or "Romans 8" for a whole chapter
+  function formatRef(bookAbbr, chapter, verses) {
+    const name = I18N.bookName(bookAbbr);
+    const book = BIBLE_DATA.getBook(bookAbbr);
+    const sorted = [...verses].sort((a, b) => a - b);
+    if (book && sorted.length === book.chapters[chapter - 1]) return `${name} ${chapter}`;
+    const parts = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const start = sorted[i];
+      while (i + 1 < sorted.length && sorted[i + 1] === sorted[i] + 1) i++;
+      parts.push(start === sorted[i] ? `${start}` : `${start}–${sorted[i]}`);
+    }
+    return `${name} ${chapter}:${parts.join(', ')}`;
+  }
+
+  // ===== Reading context =====
+  function updateContextBar() {
+    const ctx = state.context;
+    dom.contextBar.querySelectorAll('.ctx-chip').forEach(chip => {
+      const on = chip.dataset.place ? chip.dataset.place === ctx.place : chip.dataset.sermon === ctx.sermonRole;
+      chip.classList.toggle('active', on);
+    });
+    dom.sermonDetails.classList.toggle('hidden', !ctx.sermonRole);
+    dom.sermonMainSelect.classList.toggle('hidden', ctx.sermonRole !== 'support');
+    if (ctx.sermonRole && !dom.sermonDate.value) dom.sermonDate.value = localDateKey(Date.now());
+    if (ctx.sermonRole === 'support') fillSermonMainSelect();
+  }
+
+  // Offer recent sermon main texts; default to the one on the chosen sermon date, else the latest
+  function fillSermonMainSelect() {
+    const sermons = storage.getSermons().slice(0, 12);
+    const date = dom.sermonDate.value;
+    const match = sermons.find(se => se.sermonDate === date) || sermons[0];
+    dom.sermonMainSelect.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = t('noMainText');
+    dom.sermonMainSelect.appendChild(none);
+    for (const se of sermons) {
+      const opt = document.createElement('option');
+      opt.value = se.timestamp;
+      opt.textContent = `${se.sermonDate} · ${formatRef(se.book, se.chapter, se.verses)}`;
+      dom.sermonMainSelect.appendChild(opt);
+    }
+    dom.sermonMainSelect.value = match ? String(match.timestamp) : '';
+  }
+
+  dom.contextBar.addEventListener('click', (e) => {
+    const chip = e.target.closest('.ctx-chip');
+    if (!chip) return;
+    const ctx = state.context;
+    if (chip.dataset.place) {
+      ctx.place = ctx.place === chip.dataset.place ? null : chip.dataset.place;
+    } else {
+      ctx.sermonRole = ctx.sermonRole === chip.dataset.sermon ? null : chip.dataset.sermon;
+    }
+    updateContextBar();
+  });
+
+  dom.sermonDate.addEventListener('change', () => {
+    if (state.context.sermonRole === 'support') fillSermonMainSelect();
+  });
+
   // ===== Mark Read =====
   // Save a reading, then re-render and offer undo
-  async function logReading(verses, message) {
+  async function logReading(verses, message, context = {}) {
     const timestamp = Date.now();
-    await storage.markRead(verses, timestamp);
+    await storage.markRead(verses, timestamp, context);
     refreshCurrentView();
     showToast(message, {
       label: t('undo'),
@@ -632,12 +702,20 @@
     }));
     state.selectedVerses.clear();
 
+    const context = { place: state.context.place, sermonRole: state.context.sermonRole };
+    if (context.sermonRole) {
+      context.sermonDate = dom.sermonDate.value || localDateKey(Date.now());
+      if (context.sermonRole === 'support') context.sermonMain = Number(dom.sermonMainSelect.value) || null;
+    }
+    state.context.sermonRole = null;
+    updateContextBar();
+
     const count = verses.length;
     await logReading(verses, t('versesLogged', {
       n: count, s: count > 1 ? 's' : '',
       book: I18N.bookName(state.currentBook),
       ch: state.currentChapter
-    }));
+    }), context);
 
     if (navigator.vibrate) navigator.vibrate(30);
   }
@@ -733,6 +811,32 @@
           </div>`;
         }
         html += `</div></div>`;
+      }
+
+      // Sermons
+      const sermons = storage.getSermons().slice(0, 10);
+      if (sermons.length > 0) {
+        html += `<div class="dash-card"><h3>${t('sermons')}</h3><div class="sermon-list">`;
+        for (const se of sermons) {
+          html += `<div class="sermon-item">
+            <div class="sermon-date">${se.sermonDate}</div>
+            <div class="sermon-main">${formatRef(se.book, se.chapter, se.verses)}</div>
+            ${se.supporting.map(sup => `<div class="sermon-support">↳ ${formatRef(sup.book, sup.chapter, sup.verses)}</div>`).join('')}
+          </div>`;
+        }
+        html += `</div></div>`;
+      }
+
+      // Where
+      const { home, church } = stats.placeCounts;
+      if (home + church > 0) {
+        html += `<div class="dash-card">
+          <h3>${t('whereRead')}</h3>
+          <div class="stat-grid">
+            <div class="stat-item"><div class="stat-value">${home}</div><div class="stat-label">${t('ctxHome')}</div></div>
+            <div class="stat-item"><div class="stat-value">${church}</div><div class="stat-label">${t('ctxChurch')}</div></div>
+          </div>
+        </div>`;
       }
 
       // Milestones
@@ -885,6 +989,7 @@
   applyStaticI18n();
   initTheme();
   updateSettingsHighlights();
+  updateContextBar();
   state.navStack = ['books'];
   renderBookGrid();
 

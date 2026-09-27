@@ -77,6 +77,14 @@ const I18N = {
       chapterMarkedRead: '{book} {ch} marked as read',
       undo: 'Undo',
       undone: 'Undone',
+      // Reading context
+      ctxHome: 'Home',
+      ctxChurch: 'Church',
+      ctxSermonMain: 'Sermon',
+      ctxSermonSupport: 'Supporting',
+      noMainText: 'Not linked',
+      sermons: 'Sermons',
+      whereRead: 'Where',
       readNTimes: 'Read {n} time{s}',
       // Dashboard
       overview: 'Overview',
@@ -135,6 +143,14 @@ const I18N = {
       chapterMarkedRead: '{book} {ch}장 읽음 표시 완료',
       undo: '취소',
       undone: '취소됨',
+      // Reading context
+      ctxHome: '집',
+      ctxChurch: '교회',
+      ctxSermonMain: '설교 본문',
+      ctxSermonSupport: '보조 본문',
+      noMainText: '연결 안 함',
+      sermons: '설교',
+      whereRead: '읽은 장소',
       readNTimes: '{n}회 읽음',
       // Dashboard
       overview: '개요',

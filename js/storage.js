@@ -1,7 +1,11 @@
 // IndexedDB-based storage for Bible reading data
 const DB_NAME = 'bhible';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'readings';
+// One row per "Mark as Read" action, keyed by its timestamp (shared with its readings rows):
+// { timestamp, book, chapter, verses: [n...], place: 'home'|'church'|null,
+//   sermonRole: 'main'|'support'|null, sermonDate: 'YYYY-MM-DD'|null, sermonMain: <main session timestamp>|null }
+const SESSION_STORE = 'sessions';
 
 // Calendar day in the user's local timezone, "YYYY-MM-DD" (streaks must not roll over at UTC midnight)
 function localDateKey(tsOrDate) {
@@ -23,6 +27,8 @@ class BibleStorage {
     this.cache = {};
     // Index: { "Gen": Set("Gen:1:1", ...) } so per-book queries don't scan the whole cache
     this.byBook = {};
+    // Sessions, newest first
+    this.sessions = [];
     this.ready = this._init();
   }
 
@@ -36,6 +42,9 @@ class BibleStorage {
           store.createIndex('verseKey', 'verseKey', { unique: false });
           store.createIndex('timestamp', 'timestamp', { unique: false });
         }
+        if (!db.objectStoreNames.contains(SESSION_STORE)) {
+          db.createObjectStore(SESSION_STORE, { keyPath: 'timestamp' });
+        }
       };
       req.onsuccess = (e) => {
         this.db = e.target.result;
@@ -47,18 +56,19 @@ class BibleStorage {
 
   async _loadCache() {
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => {
+      const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readonly');
+      const readingsReq = tx.objectStore(STORE_NAME).getAll();
+      const sessionsReq = tx.objectStore(SESSION_STORE).getAll();
+      tx.oncomplete = () => {
         this.cache = {};
         this.byBook = {};
-        for (const record of req.result) {
+        for (const record of readingsReq.result) {
           this._cacheAdd(record.verseKey, record.book, record.timestamp);
         }
+        this.sessions = sessionsReq.result.sort((a, b) => b.timestamp - a.timestamp);
         resolve();
       };
-      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
     });
   }
 
@@ -80,16 +90,48 @@ class BibleStorage {
     }
   }
 
+  _sessionAdd(session) {
+    this.sessions = this.sessions.filter(se => se.timestamp !== session.timestamp);
+    this.sessions.push(session);
+    this.sessions.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  // Sermon main texts, newest sermon date first, each with its supporting texts attached
+  getSermons() {
+    const mains = this.sessions.filter(se => se.sermonRole === 'main');
+    const byMain = new Map(mains.map(m => [m.timestamp, { ...m, supporting: [] }]));
+    for (const se of this.sessions) {
+      if (se.sermonRole === 'support' && byMain.has(se.sermonMain)) {
+        byMain.get(se.sermonMain).supporting.unshift(se); // sessions are newest-first; keep supports in logged order
+      }
+    }
+    return [...byMain.values()].sort((a, b) =>
+      (b.sermonDate || '').localeCompare(a.sermonDate || '') || b.timestamp - a.timestamp);
+  }
+
   _bookKeys(book) {
     return this.byBook[book] || [];
   }
 
-  // Mark verses as read. verses = [{book, chapter, verse}], timestamp = Date.now()
-  async markRead(verses, timestamp = Date.now()) {
+  // Mark verses as read. verses = [{book, chapter, verse}] (all in one chapter), timestamp = Date.now()
+  // context = { place, sermonRole, sermonDate, sermonMain } (all optional)
+  async markRead(verses, timestamp = Date.now(), context = {}) {
     await this.ready;
+    const session = {
+      timestamp,
+      book: verses[0].book,
+      chapter: verses[0].chapter,
+      verses: verses.map(v => v.verse),
+      place: context.place || null,
+      sermonRole: context.sermonRole || null,
+      sermonDate: context.sermonRole ? (context.sermonDate || localDateKey(timestamp)) : null,
+      sermonMain: context.sermonRole === 'support' ? (context.sermonMain || null) : null
+    };
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
+      tx.objectStore(SESSION_STORE).put(session);
+      this._sessionAdd(session);
       for (const v of verses) {
         const verseKey = `${v.book}:${v.chapter}:${v.verse}`;
         const record = { verseKey, book: v.book, chapter: v.chapter, verse: v.verse, timestamp };
@@ -106,7 +148,9 @@ class BibleStorage {
     await this.ready;
     const keys = new Set(verses.map(v => `${v.book}:${v.chapter}:${v.verse}`));
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readwrite');
+      tx.objectStore(SESSION_STORE).delete(timestamp);
+      this.sessions = this.sessions.filter(se => se.timestamp !== timestamp);
       const req = tx.objectStore(STORE_NAME).index('timestamp').openCursor(IDBKeyRange.only(timestamp));
       req.onsuccess = () => {
         const cursor = req.result;
@@ -230,20 +274,25 @@ class BibleStorage {
   async exportData() {
     await this.ready;
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        const data = req.result.map(r => ({
+      const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readonly');
+      const readingsReq = tx.objectStore(STORE_NAME).getAll();
+      const sessionsReq = tx.objectStore(SESSION_STORE).getAll();
+      tx.oncomplete = () => {
+        const data = readingsReq.result.map(r => ({
           verseKey: r.verseKey,
           book: r.book,
           chapter: r.chapter,
           verse: r.verse,
           timestamp: r.timestamp
         }));
-        resolve(JSON.stringify({ version: 1, exportDate: new Date().toISOString(), readings: data }, null, 2));
+        resolve(JSON.stringify({
+          version: 2,
+          exportDate: new Date().toISOString(),
+          readings: data,
+          sessions: sessionsReq.result
+        }, null, 2));
       };
-      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
     });
   }
 
@@ -258,9 +307,9 @@ class BibleStorage {
     if (mode === 'replace') {
       // Clear existing data
       await new Promise((resolve, reject) => {
-        const tx = this.db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.clear();
+        const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readwrite');
+        tx.objectStore(STORE_NAME).clear();
+        tx.objectStore(SESSION_STORE).clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
@@ -273,8 +322,15 @@ class BibleStorage {
       for (const ts of this.cache[key]) seen.add(`${key}@${ts}`);
     }
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const tx = this.db.transaction([STORE_NAME, SESSION_STORE], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
+      // Sessions are keyed by timestamp, so re-importing just overwrites them
+      const sessionStore = tx.objectStore(SESSION_STORE);
+      for (const se of Array.isArray(data.sessions) ? data.sessions : []) {
+        if (Number.isFinite(se.timestamp) && BIBLE_DATA.getBook(se.book) && Array.isArray(se.verses)) {
+          sessionStore.put(se);
+        }
+      }
       for (const r of data.readings) {
         const book = BIBLE_DATA.getBook(r.book);
         const ch = Number(r.chapter), v = Number(r.verse), ts = Number(r.timestamp);
@@ -372,7 +428,13 @@ class BibleStorage {
       }
     }
 
+    const placeCounts = { home: 0, church: 0 };
+    for (const se of this.sessions) {
+      if (se.place in placeCounts) placeCounts[se.place]++;
+    }
+
     return {
+      placeCounts,
       totalReadings,
       uniqueVerses,
       totalBibleVerses,
