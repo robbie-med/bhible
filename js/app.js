@@ -105,6 +105,7 @@
   function setReader(id) {
     localStorage.setItem('bhible-reader', id);
     updateSettingsHighlights();
+    if (state.currentBook) updateMarkBtn();
   }
 
   // ===== Settings Panel =====
@@ -144,15 +145,30 @@
 
   // ===== Toast =====
   let toastTimeout;
-  function showToast(msg) {
+  function hideToast() {
+    dom.toast.classList.remove('show');
+    toastTimeout = setTimeout(() => dom.toast.classList.add('hidden'), 300);
+  }
+
+  // action: optional { label, onClick } rendered as a button (e.g. Undo)
+  function showToast(msg, action) {
     dom.toast.textContent = msg;
+    dom.toast.classList.toggle('has-action', !!action);
+    if (action) {
+      const btn = document.createElement('button');
+      btn.className = 'toast-action';
+      btn.textContent = action.label;
+      btn.addEventListener('click', () => {
+        clearTimeout(toastTimeout);
+        hideToast();
+        action.onClick();
+      }, { once: true });
+      dom.toast.appendChild(btn);
+    }
     dom.toast.classList.remove('hidden');
     dom.toast.classList.add('show');
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => {
-      dom.toast.classList.remove('show');
-      setTimeout(() => dom.toast.classList.add('hidden'), 300);
-    }, 2200);
+    toastTimeout = setTimeout(hideToast, action ? 5000 : 2200);
   }
 
   // ===== Navigation =====
@@ -345,16 +361,8 @@
       const heatLevel = getHeatLevel(completionRatio, maxHeat);
 
       const cell = document.createElement('div');
-      cell.className = 'chapter-cell';
+      cell.className = 'chapter-cell' + (heatLevel === 0 ? ' unread' : '');
       cell.style.background = getHeatColor(heatLevel);
-      if (heatLevel === 0) cell.setAttribute('data-heat', '0');
-      if (heatLevel === 0) {
-        cell.style.border = '1px solid var(--border)';
-        cell.style.color = 'var(--text-secondary)';
-      } else {
-        cell.style.color = 'var(--text-primary)';
-        cell.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
-      }
 
       const num = document.createElement('span');
       num.className = 'chapter-num';
@@ -368,56 +376,194 @@
         cell.appendChild(progress);
       }
 
-      // Long press to mark entire chapter, short tap to navigate
-      let longPressTimer;
-      let longPressFired = false;
-      const startLongPress = (e) => {
-        longPressFired = false;
-        longPressTimer = setTimeout(async () => {
-          longPressFired = true;
-          const verses = [];
-          for (let v = 1; v <= verseCount; v++) {
-            verses.push({ book: state.currentBook, chapter: chNum, verse: v });
-          }
-          await storage.markRead(verses);
-          showToast(t('chapterMarkedRead', { book: I18N.bookName(state.currentBook), ch: chNum }));
-          renderChapterGrid();
-          if (navigator.vibrate) navigator.vibrate(50);
-        }, 600);
-      };
-      const cancelLongPress = () => clearTimeout(longPressTimer);
-
-      cell.addEventListener('touchstart', (e) => {
-        startLongPress(e);
-      }, { passive: true });
-      cell.addEventListener('touchend', (e) => {
-        cancelLongPress();
-        if (!longPressFired) {
-          state.currentChapter = chNum;
-          state.selectedVerses.clear();
-          navigateTo('verses');
-          renderVerseGrid();
-        }
-        e.preventDefault();
-      });
-      cell.addEventListener('touchmove', cancelLongPress);
-      cell.addEventListener('mousedown', startLongPress);
-      cell.addEventListener('mouseup', cancelLongPress);
-      cell.addEventListener('mouseleave', cancelLongPress);
-
-      cell.addEventListener('click', (e) => {
-        if (longPressFired) return;
-        state.currentChapter = chNum;
-        state.selectedVerses.clear();
-        navigateTo('verses');
-        renderVerseGrid();
-      });
+      cell.dataset.chapter = chNum;
 
       dom.chapterGrid.appendChild(cell);
     });
 
     dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook);
   }
+
+  // ===== Chapter gestures (delegated, bound once) =====
+  // Tap = open chapter (via click, which browsers suppress after a scroll).
+  // Hold still for LONG_PRESS_MS = mark whole chapter read (with undo).
+  const LONG_PRESS_MS = 600;
+  const MOVE_TOLERANCE_PX = 10;
+  const chapterPress = { timer: null, fired: false, x: 0, y: 0 };
+
+  function startChapterPress(cell, x, y) {
+    clearTimeout(chapterPress.timer);
+    chapterPress.fired = false;
+    chapterPress.x = x;
+    chapterPress.y = y;
+    chapterPress.timer = setTimeout(() => {
+      chapterPress.fired = true;
+      markChapterRead(parseInt(cell.dataset.chapter));
+    }, LONG_PRESS_MS);
+  }
+
+  function cancelChapterPress() {
+    clearTimeout(chapterPress.timer);
+  }
+
+  function movedTooFar(x, y, origin) {
+    return Math.abs(x - origin.x) > MOVE_TOLERANCE_PX || Math.abs(y - origin.y) > MOVE_TOLERANCE_PX;
+  }
+
+  async function markChapterRead(chNum) {
+    const book = BIBLE_DATA.getBook(state.currentBook);
+    const verses = [];
+    for (let v = 1; v <= book.chapters[chNum - 1]; v++) {
+      verses.push({ book: state.currentBook, chapter: chNum, verse: v });
+    }
+    await logReading(verses, t('chapterMarkedRead', { book: I18N.bookName(state.currentBook), ch: chNum }));
+    if (navigator.vibrate) navigator.vibrate(50);
+  }
+
+  dom.chapterGrid.addEventListener('touchstart', (e) => {
+    const cell = e.target.closest('.chapter-cell');
+    if (!cell || e.touches.length > 1) return cancelChapterPress();
+    startChapterPress(cell, e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  dom.chapterGrid.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    if (movedTooFar(touch.clientX, touch.clientY, chapterPress)) cancelChapterPress();
+  }, { passive: true });
+  dom.chapterGrid.addEventListener('touchend', (e) => {
+    cancelChapterPress();
+    if (chapterPress.fired) e.preventDefault(); // swallow the click that would open the chapter
+  });
+  dom.chapterGrid.addEventListener('touchcancel', cancelChapterPress);
+  dom.chapterGrid.addEventListener('mousedown', (e) => {
+    const cell = e.target.closest('.chapter-cell');
+    if (cell && e.button === 0) startChapterPress(cell, e.clientX, e.clientY);
+  });
+  dom.chapterGrid.addEventListener('mousemove', (e) => {
+    if (movedTooFar(e.clientX, e.clientY, chapterPress)) cancelChapterPress();
+  });
+  dom.chapterGrid.addEventListener('mouseup', cancelChapterPress);
+  dom.chapterGrid.addEventListener('mouseleave', cancelChapterPress);
+  dom.chapterGrid.addEventListener('contextmenu', (e) => e.preventDefault());
+  dom.chapterGrid.addEventListener('click', (e) => {
+    const cell = e.target.closest('.chapter-cell');
+    if (!cell || chapterPress.fired) return;
+    state.currentChapter = parseInt(cell.dataset.chapter);
+    state.selectedVerses.clear();
+    navigateTo('verses');
+    renderVerseGrid();
+  });
+
+  // ===== Verse selection =====
+  function updateMarkBtn() {
+    const n = state.selectedVerses.size;
+    dom.markReadBtn.disabled = n === 0;
+    if (n > 0) {
+      dom.markReadBtn.textContent = t('markNVersesAsRead', { n, s: n > 1 ? 's' : '' });
+      dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, Math.min(...state.selectedVerses));
+    } else {
+      dom.markReadBtn.textContent = t('markAsRead');
+      dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
+    }
+  }
+
+  function paintSelection() {
+    dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => {
+      c.classList.toggle('selected', state.selectedVerses.has(parseInt(c.dataset.verse)));
+    });
+    updateMarkBtn();
+  }
+
+  // Drag-select: selection = snapshot at drag start, with anchor..current range selected/deselected.
+  // Filling the whole range means fast drags can't skip cells.
+  const drag = { active: false, mode: null, anchor: null, snapshot: null };
+
+  function beginDrag(verseNum) {
+    drag.active = true;
+    drag.anchor = verseNum;
+    drag.mode = state.selectedVerses.has(verseNum) ? 'deselect' : 'select';
+    drag.snapshot = new Set(state.selectedVerses);
+    dragTo(verseNum);
+  }
+
+  function dragTo(verseNum) {
+    if (!drag.active || verseNum == null) return;
+    const next = new Set(drag.snapshot);
+    const lo = Math.min(drag.anchor, verseNum), hi = Math.max(drag.anchor, verseNum);
+    for (let v = lo; v <= hi; v++) {
+      if (drag.mode === 'select') next.add(v); else next.delete(v);
+    }
+    state.selectedVerses = next;
+    paintSelection();
+  }
+
+  function endDrag() {
+    drag.active = false;
+  }
+
+  function verseAt(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const cell = el && el.closest('#verse-grid .verse-cell');
+    return cell ? parseInt(cell.dataset.verse) : null;
+  }
+
+  // Touch: tap toggles one verse; a swipe scrolls the page; hold briefly then drag to select a range.
+  const VERSE_HOLD_MS = 250;
+  const verseTouch = { timer: null, verse: null, x: 0, y: 0, scrolling: false };
+
+  dom.verseGrid.addEventListener('touchstart', (e) => {
+    const cell = e.target.closest('.verse-cell');
+    clearTimeout(verseTouch.timer);
+    if (!cell || e.touches.length > 1) { verseTouch.verse = null; return; }
+    verseTouch.verse = parseInt(cell.dataset.verse);
+    verseTouch.x = e.touches[0].clientX;
+    verseTouch.y = e.touches[0].clientY;
+    verseTouch.scrolling = false;
+    verseTouch.timer = setTimeout(() => {
+      beginDrag(verseTouch.verse);
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, VERSE_HOLD_MS);
+  }, { passive: true });
+
+  dom.verseGrid.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    if (drag.active) {
+      e.preventDefault(); // we own this gesture now: no scrolling while range-selecting
+      dragTo(verseAt(touch.clientX, touch.clientY));
+    } else if (movedTooFar(touch.clientX, touch.clientY, verseTouch)) {
+      clearTimeout(verseTouch.timer);
+      verseTouch.scrolling = true;
+    }
+  }, { passive: false });
+
+  dom.verseGrid.addEventListener('touchend', (e) => {
+    clearTimeout(verseTouch.timer);
+    if (verseTouch.verse == null) return;
+    if (!drag.active && !verseTouch.scrolling) {
+      beginDrag(verseTouch.verse); // a tap is a one-cell drag
+    }
+    endDrag();
+    verseTouch.verse = null;
+    e.preventDefault(); // suppress emulated mouse events, which would toggle again
+  });
+
+  dom.verseGrid.addEventListener('touchcancel', () => {
+    clearTimeout(verseTouch.timer);
+    verseTouch.verse = null;
+    endDrag();
+  });
+
+  // Mouse: press and drag selects immediately (no scroll conflict with a wheel)
+  dom.verseGrid.addEventListener('mousedown', (e) => {
+    const cell = e.target.closest('.verse-cell');
+    if (!cell || e.button !== 0) return;
+    beginDrag(parseInt(cell.dataset.verse));
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (drag.active) dragTo(verseAt(e.clientX, e.clientY));
+  });
+  document.addEventListener('mouseup', endDrag);
+  dom.verseGrid.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // ===== Verse Grid =====
   function renderVerseGrid() {
@@ -435,50 +581,15 @@
 
     dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
 
-    let isDragging = false;
-    let dragMode = null;
-
-    const updateMarkBtn = () => {
-      dom.markReadBtn.disabled = state.selectedVerses.size === 0;
-      if (state.selectedVerses.size > 0) {
-        const s = state.selectedVerses.size > 1 ? 's' : '';
-        dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
-        const firstVerse = Math.min(...state.selectedVerses);
-        dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
-      } else {
-        dom.markReadBtn.textContent = t('markAsRead');
-        dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
-      }
-    };
-
-    const toggleVerse = (verseNum, forceMode) => {
-      const mode = forceMode || (state.selectedVerses.has(verseNum) ? 'deselect' : 'select');
-      if (mode === 'select') {
-        state.selectedVerses.add(verseNum);
-      } else {
-        state.selectedVerses.delete(verseNum);
-      }
-      const cell = dom.verseGrid.querySelector(`[data-verse="${verseNum}"]`);
-      if (cell) cell.classList.toggle('selected', state.selectedVerses.has(verseNum));
-      updateMarkBtn();
-      return mode;
-    };
-
     for (let v = 1; v <= verseCount; v++) {
       const readCount = storage.getVerseCount(state.currentBook, state.currentChapter, v);
       const heatLevel = getHeatLevel(readCount, maxCount);
 
       const cell = document.createElement('div');
-      cell.className = 'verse-cell';
+      cell.className = 'verse-cell' + (heatLevel === 0 ? ' unread' : '');
+      if (state.selectedVerses.has(v)) cell.classList.add('selected');
       cell.dataset.verse = v;
       cell.style.background = getHeatColor(heatLevel);
-      if (heatLevel === 0) {
-        cell.style.border = '2px solid var(--border)';
-        cell.style.color = 'var(--text-secondary)';
-      } else {
-        cell.style.color = 'var(--text-primary)';
-        cell.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
-      }
 
       cell.textContent = v;
 
@@ -489,79 +600,46 @@
         cell.appendChild(dot);
       }
 
-      cell.addEventListener('touchstart', (e) => {
-        isDragging = true;
-        dragMode = toggleVerse(v);
-        e.preventDefault();
-      }, { passive: false });
-
-      cell.addEventListener('touchmove', (e) => {
-        if (!isDragging) return;
-        const touch = e.touches[0];
-        const el = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (el && el.dataset.verse) {
-          const num = parseInt(el.dataset.verse);
-          if (dragMode === 'select' && !state.selectedVerses.has(num)) {
-            toggleVerse(num, 'select');
-          } else if (dragMode === 'deselect' && state.selectedVerses.has(num)) {
-            toggleVerse(num, 'deselect');
-          }
-        }
-        e.preventDefault();
-      }, { passive: false });
-
-      cell.addEventListener('touchend', () => { isDragging = false; });
-      cell.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        dragMode = toggleVerse(v);
-        e.preventDefault();
-      });
-
       dom.verseGrid.appendChild(cell);
     }
-
-    dom.verseGrid.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (el && el.dataset.verse) {
-        const num = parseInt(el.dataset.verse);
-        if (dragMode === 'select' && !state.selectedVerses.has(num)) {
-          toggleVerse(num, 'select');
-        } else if (dragMode === 'deselect' && state.selectedVerses.has(num)) {
-          toggleVerse(num, 'deselect');
-        }
-      }
-    });
-
-    document.addEventListener('mouseup', () => { isDragging = false; });
 
     updateMarkBtn();
   }
 
   // ===== Mark Read =====
+  // Save a reading, then re-render and offer undo
+  async function logReading(verses, message) {
+    const timestamp = Date.now();
+    await storage.markRead(verses, timestamp);
+    refreshCurrentView();
+    showToast(message, {
+      label: t('undo'),
+      onClick: async () => {
+        await storage.unmarkRead(verses, timestamp);
+        refreshCurrentView();
+        showToast(t('undone'));
+      }
+    });
+  }
+
   async function markSelectedAsRead() {
     if (state.selectedVerses.size === 0) return;
 
-    const verses = [...state.selectedVerses].map(v => ({
+    const verses = [...state.selectedVerses].sort((a, b) => a - b).map(v => ({
       book: state.currentBook,
       chapter: state.currentChapter,
       verse: v
     }));
-
-    await storage.markRead(verses);
+    state.selectedVerses.clear();
 
     const count = verses.length;
-    const s = count > 1 ? 's' : '';
-    showToast(t('versesLogged', {
-      n: count, s,
+    await logReading(verses, t('versesLogged', {
+      n: count, s: count > 1 ? 's' : '',
       book: I18N.bookName(state.currentBook),
       ch: state.currentChapter
     }));
 
     if (navigator.vibrate) navigator.vibrate(30);
-
-    state.selectedVerses.clear();
-    renderVerseGrid();
   }
 
   // ===== Dashboard =====
@@ -687,12 +765,12 @@
       a.href = url;
       a.download = `bhible-export-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       showToast(t('dataExported'));
     } catch (err) {
       showToast(t('exportFailed', { err: err.message }));
     }
-    closeMenu();
+    closeSettings();
   }
 
   async function importData(file) {
@@ -702,10 +780,9 @@
       const count = data.readings ? data.readings.length : 0;
 
       if (confirm(t('importConfirm', { n: count.toLocaleString() }))) {
-        await storage.importData(text, 'merge');
-        showToast(t('nReadingsImported', { n: count.toLocaleString() }));
-        renderBookGrid();
-        renderDashboard();
+        const { added } = await storage.importData(text, 'merge');
+        showToast(t('nReadingsImported', { n: added.toLocaleString() }));
+        refreshCurrentView();
       }
     } catch (err) {
       showToast(t('importFailed', { err: err.message }));
@@ -788,20 +865,12 @@
     for (let v = 1; v <= verseCount; v++) {
       state.selectedVerses.add(v);
     }
-    dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => c.classList.add('selected'));
-    dom.markReadBtn.disabled = false;
-    const s = state.selectedVerses.size > 1 ? 's' : '';
-    dom.markReadBtn.textContent = t('markNVersesAsRead', { n: state.selectedVerses.size, s });
-    const firstVerse = Math.min(...state.selectedVerses);
-    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter, firstVerse);
+    paintSelection();
   });
 
   dom.deselectAllBtn.addEventListener('click', () => {
     state.selectedVerses.clear();
-    dom.verseGrid.querySelectorAll('.verse-cell').forEach(c => c.classList.remove('selected'));
-    dom.markReadBtn.disabled = true;
-    dom.markReadBtn.textContent = t('markAsRead');
-    dom.readerLink.href = BIBLE_DATA.getRelightUrl(state.currentBook, state.currentChapter);
+    paintSelection();
   });
 
   dom.markReadBtn.addEventListener('click', markSelectedAsRead);

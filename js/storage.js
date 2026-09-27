@@ -3,11 +3,26 @@ const DB_NAME = 'bhible';
 const DB_VERSION = 1;
 const STORE_NAME = 'readings';
 
+// Calendar day in the user's local timezone, "YYYY-MM-DD" (streaks must not roll over at UTC midnight)
+function localDateKey(tsOrDate) {
+  const d = new Date(tsOrDate);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Whole days between two "YYYY-MM-DD" keys
+function dayDiff(a, b) {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
 class BibleStorage {
   constructor() {
     this.db = null;
     // In-memory cache: { "Gen:1:1": [timestamp1, timestamp2, ...] }
     this.cache = {};
+    // Index: { "Gen": Set("Gen:1:1", ...) } so per-book queries don't scan the whole cache
+    this.byBook = {};
     this.ready = this._init();
   }
 
@@ -37,16 +52,36 @@ class BibleStorage {
       const req = store.getAll();
       req.onsuccess = () => {
         this.cache = {};
+        this.byBook = {};
         for (const record of req.result) {
-          if (!this.cache[record.verseKey]) {
-            this.cache[record.verseKey] = [];
-          }
-          this.cache[record.verseKey].push(record.timestamp);
+          this._cacheAdd(record.verseKey, record.book, record.timestamp);
         }
         resolve();
       };
       req.onerror = () => reject(req.error);
     });
+  }
+
+  _cacheAdd(verseKey, book, timestamp) {
+    if (!this.cache[verseKey]) this.cache[verseKey] = [];
+    this.cache[verseKey].push(timestamp);
+    if (!this.byBook[book]) this.byBook[book] = new Set();
+    this.byBook[book].add(verseKey);
+  }
+
+  _cacheRemove(verseKey, book, timestamp) {
+    const list = this.cache[verseKey];
+    if (!list) return;
+    const i = list.indexOf(timestamp);
+    if (i !== -1) list.splice(i, 1);
+    if (list.length === 0) {
+      delete this.cache[verseKey];
+      if (this.byBook[book]) this.byBook[book].delete(verseKey);
+    }
+  }
+
+  _bookKeys(book) {
+    return this.byBook[book] || [];
   }
 
   // Mark verses as read. verses = [{book, chapter, verse}], timestamp = Date.now()
@@ -59,9 +94,30 @@ class BibleStorage {
         const verseKey = `${v.book}:${v.chapter}:${v.verse}`;
         const record = { verseKey, book: v.book, chapter: v.chapter, verse: v.verse, timestamp };
         store.add(record);
-        if (!this.cache[verseKey]) this.cache[verseKey] = [];
-        this.cache[verseKey].push(timestamp);
+        this._cacheAdd(verseKey, v.book, timestamp);
       }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // Undo a markRead: delete the records for these verses carrying exactly this timestamp
+  async unmarkRead(verses, timestamp) {
+    await this.ready;
+    const keys = new Set(verses.map(v => `${v.book}:${v.chapter}:${v.verse}`));
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(STORE_NAME, 'readwrite');
+      const req = tx.objectStore(STORE_NAME).index('timestamp').openCursor(IDBKeyRange.only(timestamp));
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        const r = cursor.value;
+        if (keys.has(r.verseKey)) {
+          cursor.delete();
+          this._cacheRemove(r.verseKey, r.book, r.timestamp);
+        }
+        cursor.continue();
+      };
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -77,7 +133,7 @@ class BibleStorage {
   getChapterCount(book, chapter) {
     let total = 0;
     const prefix = `${book}:${chapter}:`;
-    for (const key in this.cache) {
+    for (const key of this._bookKeys(book)) {
       if (key.startsWith(prefix)) {
         total += this.cache[key].length;
       }
@@ -89,7 +145,7 @@ class BibleStorage {
   getChapterVersesRead(book, chapter) {
     const versesRead = new Set();
     const prefix = `${book}:${chapter}:`;
-    for (const key in this.cache) {
+    for (const key of this._bookKeys(book)) {
       if (key.startsWith(prefix)) {
         versesRead.add(parseInt(key.split(':')[2]));
       }
@@ -99,14 +155,7 @@ class BibleStorage {
 
   // Get total unique verses read for a book
   getBookVersesRead(bookAbbr) {
-    const versesRead = new Set();
-    const prefix = `${bookAbbr}:`;
-    for (const key in this.cache) {
-      if (key.startsWith(prefix)) {
-        versesRead.add(key);
-      }
-    }
-    return versesRead.size;
+    return this.byBook[bookAbbr] ? this.byBook[bookAbbr].size : 0;
   }
 
   // Get max read count across all verses (for heat map scaling)
@@ -120,13 +169,10 @@ class BibleStorage {
 
   // Get max read count for verses in a specific testament
   getMaxCountByTestament(testament) {
-    const bookSet = new Set(
-      BIBLE_DATA.books.filter(b => b.testament === testament).map(b => b.abbr)
-    );
     let max = 0;
-    for (const key in this.cache) {
-      const bookAbbr = key.split(':')[0];
-      if (bookSet.has(bookAbbr)) {
+    for (const b of BIBLE_DATA.books) {
+      if (b.testament !== testament) continue;
+      for (const key of this._bookKeys(b.abbr)) {
         max = Math.max(max, this.cache[key].length);
       }
     }
@@ -152,11 +198,8 @@ class BibleStorage {
     if (!bookData) return 0;
     const totalVerses = bookData.chapters.reduce((a, b) => a + b, 0);
     let totalReads = 0;
-    const prefix = `${bookAbbr}:`;
-    for (const key in this.cache) {
-      if (key.startsWith(prefix)) {
-        totalReads += this.cache[key].length;
-      }
+    for (const key of this._bookKeys(bookAbbr)) {
+      totalReads += this.cache[key].length;
     }
     return totalReads / totalVerses;
   }
@@ -175,7 +218,7 @@ class BibleStorage {
     const byDate = {};
     for (const key in this.cache) {
       for (const ts of this.cache[key]) {
-        const date = new Date(ts).toISOString().split('T')[0];
+        const date = localDateKey(ts);
         if (!byDate[date]) byDate[date] = 0;
         byDate[date]++;
       }
@@ -223,21 +266,28 @@ class BibleStorage {
       });
     }
 
-    // Insert imported records
+    // Insert imported records, skipping invalid ones and exact duplicates (same verse + timestamp)
+    let added = 0, skipped = 0;
+    const seen = new Set();
+    for (const key in this.cache) {
+      for (const ts of this.cache[key]) seen.add(`${key}@${ts}`);
+    }
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       for (const r of data.readings) {
-        store.add({
-          verseKey: r.verseKey || `${r.book}:${r.chapter}:${r.verse}`,
-          book: r.book,
-          chapter: r.chapter,
-          verse: r.verse,
-          timestamp: r.timestamp
-        });
+        const book = BIBLE_DATA.getBook(r.book);
+        const ch = Number(r.chapter), v = Number(r.verse), ts = Number(r.timestamp);
+        const valid = book && Number.isInteger(ch) && ch >= 1 && ch <= book.chapters.length
+          && Number.isInteger(v) && v >= 1 && v <= book.chapters[ch - 1] && Number.isFinite(ts);
+        const verseKey = `${r.book}:${ch}:${v}`;
+        if (!valid || seen.has(`${verseKey}@${ts}`)) { skipped++; continue; }
+        seen.add(`${verseKey}@${ts}`);
+        store.add({ verseKey, book: r.book, chapter: ch, verse: v, timestamp: ts });
+        added++;
       }
       tx.oncomplete = () => {
-        this._loadCache().then(resolve);
+        this._loadCache().then(() => resolve({ added, skipped }));
       };
       tx.onerror = () => reject(tx.error);
     });
@@ -300,16 +350,13 @@ class BibleStorage {
     if (timestamps.length > 0) {
       const readDates = new Set();
       for (const ts of timestamps) {
-        readDates.add(new Date(ts).toISOString().split('T')[0]);
+        readDates.add(localDateKey(ts));
       }
       const sortedDates = [...readDates].sort();
       let streak = 1;
       longestStreak = 1;
       for (let i = 1; i < sortedDates.length; i++) {
-        const prev = new Date(sortedDates[i - 1]);
-        const curr = new Date(sortedDates[i]);
-        const diff = (curr - prev) / (1000 * 60 * 60 * 24);
-        if (diff === 1) {
+        if (dayDiff(sortedDates[i - 1], sortedDates[i]) === 1) {
           streak++;
           longestStreak = Math.max(longestStreak, streak);
         } else {
@@ -317,8 +364,9 @@ class BibleStorage {
         }
       }
       // Check if current streak is active (includes today or yesterday)
-      const today = new Date().toISOString().split('T')[0];
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const now = new Date();
+      const today = localDateKey(now);
+      const yesterday = localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
       if (sortedDates.includes(today) || sortedDates.includes(yesterday)) {
         currentStreak = streak;
       }

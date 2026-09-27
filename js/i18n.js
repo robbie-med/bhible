@@ -75,6 +75,8 @@ const I18N = {
       importConfirm: 'Import {n} readings? This will merge with existing data.',
       versesLogged: '{n} verse{s} in {book} {ch} logged',
       chapterMarkedRead: '{book} {ch} marked as read',
+      undo: 'Undo',
+      undone: 'Undone',
       readNTimes: 'Read {n} time{s}',
       // Dashboard
       overview: 'Overview',
@@ -131,6 +133,8 @@ const I18N = {
       importConfirm: '{n}개의 읽기 기록을 가져올까요? 기존 데이터와 병합됩니다.',
       versesLogged: '{book} {ch}장 {n}절 기록됨',
       chapterMarkedRead: '{book} {ch}장 읽음 표시 완료',
+      undo: '취소',
+      undone: '취소됨',
       readNTimes: '{n}회 읽음',
       // Dashboard
       overview: '개요',

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bhible-v4';
+const CACHE_NAME = 'bhible-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -23,21 +23,39 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k.startsWith('bhible-v') && k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
-  // Network first for navigation, cache first for assets
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+
   if (e.request.mode === 'navigate') {
+    // Network first for the page, falling back to the cached shell offline
     e.respondWith(
       fetch(e.request).catch(() => caches.match('./index.html'))
     );
-  } else {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request))
-    );
+    return;
   }
+
+  // Stale-while-revalidate: answer from cache instantly, refresh the cache in the background
+  // so a deploy reaches installed clients on the next launch even without a CACHE_NAME bump.
+  e.respondWith(
+    caches.open(CACHE_NAME).then(cache =>
+      cache.match(e.request).then(cached => {
+        const network = fetch(e.request).then(res => {
+          if (res.ok) cache.put(e.request, res.clone());
+          return res;
+        });
+        if (cached) {
+          e.waitUntil(network.catch(() => {}));
+          return cached;
+        }
+        return network;
+      })
+    )
+  );
 });
