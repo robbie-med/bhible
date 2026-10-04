@@ -18,6 +18,7 @@ A mobile-first Progressive Web App that tracks Bible reading with a GitHub-style
 - **Confessions** - Apostles', Nicene, Athanasian and Chalcedonian creeds; Westminster Confession, Larger & Shorter Catechisms; Heidelberg Catechism (with Lord's Days); 1689 London Baptist Confession; the Didache. Scripture proofs open in the reader. Korean: 사도신경 so far
 - **External Readers** - Relight, Hangl, or STEP Bible instead of the built-in reader
 - **Installable PWA** - Works offline, install to home screen
+- **Deep Links** - Other apps open a passage with `https://bhible.robbiemed.org/?ref=John+3:16-18`. It accepts `Rom 8:1, 3-5`, `1 Jn 1:9`, `Psalm 23`, `요 3장 16절`, or OSIS `John.3.16`. The verses arrive selected, ready to mark as read. On Android the link opens the BHible app.
 
 ## Deployment (GitHub Pages)
 

@@ -100,6 +100,7 @@ const I18N = {
       proofs: 'Proofs',
       jumpTo: 'Go to',
       koUnavailable: 'Korean translation not available yet. Showing English.',
+      refNotFound: "Couldn't find the passage \"{ref}\"",
       // Reading context
       ctxPersonal: 'Personal',
       ctxFamily: 'Family Worship',
@@ -191,6 +192,7 @@ const I18N = {
       proofs: '증거 구절',
       jumpTo: '이동',
       koUnavailable: '한국어 번역이 아직 없어 영어로 표시합니다.',
+      refNotFound: '"{ref}" 구절을 찾을 수 없습니다',
       // Reading context
       ctxPersonal: '개인',
       ctxFamily: '가정예배',

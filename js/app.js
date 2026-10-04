@@ -1057,6 +1057,10 @@
     return `${name} ${r.chapter}:${r.from}${r.to > r.from ? `–${r.to}` : ''}`;
   }
 
+  function verseRange(from, to) {
+    return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  }
+
   // Open a passage in the chosen reader with its verses selected (ready to Mark as Read)
   function openPassage(ref) {
     const r = parseOsisRef(ref);
@@ -1066,16 +1070,88 @@
       window.open(BIBLE_DATA.getReaderUrl(readerId, r.book, r.chapter, r.whole ? null : r.from), '_blank', 'noopener');
       return;
     }
-    state.currentBook = r.book;
-    state.currentChapter = r.chapter;
-    state.selectedVerses = r.whole ? new Set() : new Set(Array.from({ length: r.to - r.from + 1 }, (_, i) => r.from + i));
-    state.currentTestament = BIBLE_DATA.getBook(r.book).testament;
+    showPassage(r.book, r.chapter, r.whole ? [] : verseRange(r.from, r.to));
+    openReader();
+  }
+
+  // Go to a chapter's verse grid with the given verses selected (none = whole chapter)
+  function showPassage(book, chapter, verses) {
+    state.currentBook = book;
+    state.currentChapter = chapter;
+    state.selectedVerses = new Set(verses);
+    state.currentTestament = BIBLE_DATA.getBook(book).testament;
     dom.testamentBtns.forEach(b => b.classList.toggle('active', b.dataset.testament === state.currentTestament));
     state.navStack = ['books', 'chapters', 'verses'];
     renderChapterGrid();
     renderVerseGrid();
     updateView();
-    openReader();
+  }
+
+  // ===== Plain references, as other apps write them =====
+  // "John 3:16-18", "1 Jn 1:9", "Psalm 23", "Rom 8:1, 3-5", "요한복음 3:16", "요 3장 16절", or OSIS "John.3.16".
+  // A range into the next chapter ("Gen 1:26-2:3") keeps the first chapter's part, like proof texts.
+  const normBook = (s) => String(s).toLowerCase().replace(/[\s.]/g, '');
+  const BOOK_ALIASES = {
+    jn: 'John', '1jn': '1John', '2jn': '2John', '3jn': '3John', mt: 'Matt', mk: 'Mark', lk: 'Luke',
+    phm: 'Phlm', songofsongs: 'Song', revelations: 'Rev'
+  };
+  let bookKeys = null;
+
+  function findBook(name) {
+    if (!bookKeys) {
+      bookKeys = new Map(Object.entries(BOOK_ALIASES));
+      for (const b of BIBLE_DATA.books) {
+        for (const k of [b.abbr, b.name, I18N.bookNames.ko[b.abbr], I18N.bookAbbrs.ko[b.abbr]]) bookKeys.set(normBook(k), b.abbr);
+      }
+    }
+    const key = normBook(name);
+    if (bookKeys.has(key)) return bookKeys.get(key);
+    // Unambiguous prefix of an English name: "Gen", "Psalm", "1 Ki" (but not "Jud")
+    const hits = BIBLE_DATA.books.filter(b => normBook(b.name).startsWith(key));
+    return key.length >= 2 && hits.length === 1 ? hits[0].abbr : null;
+  }
+
+  // → { book, chapter, verses } (verses empty = whole chapter), or null
+  function parseRef(text) {
+    const osis = parseOsisRef(text.trim());
+    if (osis) return { book: osis.book, chapter: osis.chapter, verses: osis.whole ? [] : verseRange(osis.from, osis.to) };
+
+    const s = text.trim()
+      .replace(/(\d+)\s*[장편]\s*(?=\d)/g, '$1:') // 3장 16절 → 3:16
+      .replace(/\s*[장편절]/g, '')
+      .replace(/[–—~]/g, '-');
+    const m = s.match(/^(.*?[^\d\s.])[\s.]*(\d+)(?:\s*-\s*\d+|\s*[:.]\s*([\d\s,:-]+))?$/);
+    const abbr = m && findBook(m[1]);
+    const chapter = m && parseInt(m[2]);
+    const max = abbr && BIBLE_DATA.getBook(abbr).chapters[chapter - 1];
+    if (!max) return null;
+
+    const verses = new Set();
+    for (const part of m[3] ? m[3].split(',') : []) {
+      const r = part.trim().match(/^(\d+)(?:\s*-\s*(?:(\d+)\s*:\s*)?(\d+))?$/);
+      if (!r) return null;
+      const from = parseInt(r[1]);
+      const to = !r[3] ? from : r[2] && parseInt(r[2]) !== chapter ? max : parseInt(r[3]);
+      for (let v = from; v <= Math.min(to, max); v++) verses.add(v);
+    }
+    if (m[3] && verses.size === 0) return null; // verse past the end of the chapter
+    return { book: abbr, chapter, verses: [...verses] };
+  }
+
+  // ===== Deep links: https://bhible.robbiemed.org/?ref=John+3:16-18 =====
+  // Other apps open a passage this way; the Android shell passes its intent URL to the WebView.
+  function openDeepLink() {
+    const params = new URLSearchParams(location.search);
+    const ref = params.get('ref');
+    if (ref === null) return;
+    params.delete('ref');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash); // so a reload doesn't reopen it
+    const p = parseRef(ref);
+    if (!p) return showToast(t('refNotFound', { ref }));
+    showPassage(p.book, p.chapter, p.verses);
+    // External readers would need a popup, which browsers block without a tap: the reader link is one tap away
+    if (getReader() === 'builtin') openReader();
   }
 
   // ===== Passage references =====
@@ -1475,5 +1551,6 @@
   updateContextBar();
   state.navStack = ['books'];
   renderBookGrid();
+  openDeepLink();
 
 })();
